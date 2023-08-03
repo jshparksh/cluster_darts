@@ -1,0 +1,54 @@
+#!/bin/bash
+
+programname=$0
+
+usage () {
+  cat <<EOM
+
+ Usage: $programname [docker image] [gpu(s)] [file]
+
+    [docker image]    pytroch/pytorch | tensorflow/tensorflow
+    [gpu(s)]          0 | 0,1,2 | all | none
+    [file]            train.py | test.py
+
+    Example: $programname pytorch/pytorch 0 train.py
+    Run train.py in pytorch/pytorch on GPU 0.
+
+EOM
+  exit 0
+}
+
+image=$1
+shift
+gpu=$1
+shift
+python="$*"
+
+if [ -z "$image" ]
+then
+  docker image ls --filter "dangling=false"
+  echo
+  echo " Error: Missing docker image argument! Select image from list above or from https://hub.docker.com/." 1>&2
+  usage
+  exit 1
+fi
+if [ -z "$gpu" ]
+then
+  nvidia-smi
+  echo
+  echo " Error: Missing GPU(s) argument! Select GPU(s) from list above." 1>&2
+  usage
+  exit 1
+fi
+if [ -z "$python" ]
+then
+  echo
+  echo " Error: Missing file argument!" 1>&2
+  usage
+  exit 1
+fi
+
+printf "docker run --rm --ipc=host --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=$gpu --workdir /app -v "$(pwd)":/app $image python3 -u /app/$python\n"
+printf ""
+docker run -itd --rm --ipc=host --mount type=bind,source=/dataset,target=/dataset,readonly --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=$gpu --workdir /app --name js_test_container0 -v "$(pwd)":/app $image /bin/bash
+#docker run -itd --rm --ipc=host --mount type=bind,source=/dataset,target=/dataset,readonly --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=$gpu --workdir /app --name js_cluster_test -v "$(pwd)":/app $image python3 -u /app/$python

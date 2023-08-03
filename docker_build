@@ -1,0 +1,20 @@
+#!/bin/bash
+echo $1
+echo $2
+location=$2
+if [ -z "$1" ]
+then
+  echo "Missing container name"
+  exit
+fi
+if [ -z "$2" ]
+then
+  location="."
+  2="."
+fi
+$2="."
+echo $a
+echo $2
+
+echo "build -t $USER/$1 --build-arg USER_ID=$(id -u) --build-arg GROUP_ID=$(id -g) $location"
+docker build -t $USER/$1 --build-arg USER_ID=$(id -u) --build-arg GROUP_ID=$(id -g) $location
