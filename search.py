@@ -63,12 +63,12 @@ def main():
     train_loader = torch.utils.data.DataLoader(
         train_data, batch_size=config.batch_size,
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
-        pin_memory=True, num_workers=0)
+        pin_memory=True, num_workers=4)
 
     valid_loader = torch.utils.data.DataLoader(
         train_data, batch_size=config.batch_size,
         sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:n_train]),
-        pin_memory=True, num_workers=0)
+        pin_memory=True, num_workers=4)
     
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         w_optim, config.epochs, eta_min=config.w_lr_min)
@@ -85,11 +85,11 @@ def main():
 
         # training
         train(train_loader, valid_loader, model, architect, w_optim, alpha_optim, lr, epoch)
-
+        """
         # validation
         cur_step = (epoch+1) * len(train_loader)
         top1 = validate(valid_loader, model, epoch, cur_step)
-
+        """
         # log
         # genotype
         genotype = model.genotype()
@@ -99,13 +99,13 @@ def main():
 
         utils.save_checkpoint(model.state_dict(), config.path, True)
         print()
-        """
+    """
         # genotype as a image
         plot_path = os.path.join(config.plot_path, "EP{:02d}".format(epoch+1))
         caption = "Epoch {}".format(epoch+1)
         plot(genotype.normal, plot_path + "-normal", caption)
         plot(genotype.reduce, plot_path + "-reduce", caption)
-        """
+        
         # save
         if best_top1 < top1:
             best_top1 = top1
@@ -118,6 +118,7 @@ def main():
 
     logger.info("Final best Prec@1 = {:.4%}".format(best_top1))
     logger.info("Best Genotype = {}".format(best_genotype))
+    """
 
 
 def train(train_loader, valid_loader, model, architect, w_optim, alpha_optim, lr, epoch):
@@ -173,6 +174,8 @@ def train(train_loader, valid_loader, model, architect, w_optim, alpha_optim, lr
         writer.add_scalar('train/top1', prec1.item(), cur_step)
         writer.add_scalar('train/top5', prec5.item(), cur_step)
         cur_step += 1
+        if cur_step == 3:
+            break
     model.save_features(config.path, epoch)
 
     logger.info("Train: [{:2d}/{}] Final Prec@1 {:.4%}".format(epoch+1, config.epochs, top1.avg))

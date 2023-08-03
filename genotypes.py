@@ -15,11 +15,9 @@ Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
 PRIMITIVES = [
     'sep_conv_3x3_8',
     'sep_conv_3x3_4',
-    'sep_conv_5x5_8',
     'sep_conv_5x5_4',
     'dil_conv_3x3_8',
     'dil_conv_3x3_4',
-    'dil_conv_5x5_8',
     'dil_conv_5x5_4',
     'max_pool_3x3',
     #'avg_pool_3x3',  # deleted in `1-skip` search space, replaced by `skip-connect` in `3-skip` search space
@@ -30,12 +28,10 @@ PRIMITIVES_GROUPS = [
     [
     'sep_conv_3x3_8',
     'sep_conv_3x3_4',
-    'sep_conv_5x5_8',
     'sep_conv_5x5_4'],
     [
     'dil_conv_3x3_8',
     'dil_conv_3x3_4',
-    'dil_conv_5x5_8',
     'dil_conv_5x5_4'],
     [
     'max_pool_3x3',
