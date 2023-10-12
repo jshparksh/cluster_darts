@@ -22,7 +22,7 @@ def broadcast_list(l, device_ids):
 
 class SearchCNN(nn.Module):
     """ Search CNN model """
-    def __init__(self, C, n_classes, n_layers, n_nodes=4, stem_multiplier=3):
+    def __init__(self, C, n_classes, n_layers, criterion, n_nodes=4, stem_multiplier=3, device_ids=None):
         """
         Args:
             C_in: # of input channels
@@ -36,8 +36,29 @@ class SearchCNN(nn.Module):
         self.C = C
         self.n_classes = n_classes
         self.n_layers = n_layers
+        self.criterion = criterion
+        if device_ids is None:
+            device_ids = list(range(torch.cuda.device_count()))
+        self.device_ids = device_ids
+        
         self._mixed_cell_feature = [0] * n_layers
 
+        # initialize architect parameters: alphas
+        n_ops = len(gt.PRIMITIVES)
+
+        self.alpha_normal = nn.ParameterList()
+        self.alpha_reduce = nn.ParameterList()
+
+        for i in range(n_nodes):
+            self.alpha_normal.append(nn.Parameter(1e-3*torch.randn(i+2, n_ops)))
+            self.alpha_reduce.append(nn.Parameter(1e-3*torch.randn(i+2, n_ops)))
+
+        # setup alphas list
+        self._alphas = []
+        for n, p in self.named_parameters():
+            if 'alpha' in n:
+                self._alphas.append((n, p))
+        
         C_cur = stem_multiplier * C
         self.stem = nn.Sequential(
             nn.Conv2d(3, C_cur, 3, 1, 1, bias=False),
@@ -67,9 +88,12 @@ class SearchCNN(nn.Module):
         self.gap = nn.AdaptiveAvgPool2d(1)
         self.linear = nn.Linear(C_p, n_classes)
         self._mixed_cell_feature = self.mixed_cell_feature()
-
-    def forward(self, x, weights_normal, weights_reduce):
+        
+    def forward(self, x):
         s0 = s1 = self.stem(x)
+
+        weights_normal = [F.softmax(alpha, dim=-1) for alpha in self.alpha_normal]
+        weights_reduce = [F.softmax(alpha, dim=-1) for alpha in self.alpha_reduce]
 
         for cell in self.cells:
             weights = weights_reduce if cell.reduction else weights_normal
@@ -84,56 +108,6 @@ class SearchCNN(nn.Module):
         for i in range(len(self.cells)):
             self._mixed_cell_feature[i] = self.cells[i].mixed_op_feature()
         return self._mixed_cell_feature
-
-class SearchCNNController(nn.Module):
-    """ SearchCNN controller supporting multi-gpu """
-    def __init__(self, C, n_classes, n_layers, criterion, n_nodes=4, stem_multiplier=3,
-                 device_ids=None):
-        super().__init__()
-        self.n_nodes = n_nodes
-        self.n_layers = n_layers
-        self.criterion = criterion
-        if device_ids is None:
-            device_ids = list(range(torch.cuda.device_count()))
-        self.device_ids = device_ids
-
-        # initialize architect parameters: alphas
-        n_ops = len(gt.PRIMITIVES)
-
-        self.alpha_normal = nn.ParameterList()
-        self.alpha_reduce = nn.ParameterList()
-
-        for i in range(n_nodes):
-            self.alpha_normal.append(nn.Parameter(1e-3*torch.randn(i+2, n_ops)))
-            self.alpha_reduce.append(nn.Parameter(1e-3*torch.randn(i+2, n_ops)))
-
-        # setup alphas list
-        self._alphas = []
-        for n, p in self.named_parameters():
-            if 'alpha' in n:
-                self._alphas.append((n, p))
-
-        self.net = SearchCNN(C, n_classes, n_layers, n_nodes, stem_multiplier)
-
-    def forward(self, x):
-        weights_normal = [F.softmax(alpha, dim=-1) for alpha in self.alpha_normal]
-        weights_reduce = [F.softmax(alpha, dim=-1) for alpha in self.alpha_reduce]
-
-        if len(self.device_ids) == 1:
-            return self.net(x, weights_normal, weights_reduce)
-
-        # scatter x
-        xs = nn.parallel.scatter(x, self.device_ids)
-        # broadcast weights
-        wnormal_copies = broadcast_list(weights_normal, self.device_ids)
-        wreduce_copies = broadcast_list(weights_reduce, self.device_ids)
-
-        # replicate modules
-        replicas = nn.parallel.replicate(self.net, self.device_ids)
-        outputs = nn.parallel.parallel_apply(replicas,
-                                             list(zip(xs, wnormal_copies, wreduce_copies)),
-                                             devices=self.device_ids)
-        return nn.parallel.gather(outputs, self.device_ids[0])
 
     def loss(self, X, y):
         logits = self.forward(X)
@@ -182,36 +156,7 @@ class SearchCNNController(nn.Module):
         for n, p in self._alphas:
             yield n, p
 
-    def cluster_loss(self):
-        # get output data from MixedOP, flatten and mean value
-        loss = 0
-        
-        op_names = gt.PRIMITIVES
-        op_groups = gt.PRIMITIVES_GROUPS
-        num_ops = len(op_names)
-        
-        # Group indices for seperation
-        indices = []
-        index = 0
-        for i in range(len(op_groups)):
-            indices.append(index + len(op_groups[i]))
-            index += len(op_groups[i])
-        
-        # Calculate mean of std values for loss
-        iteration = 0
-        mixed_cell_feature = self.net.mixed_cell_feature()
-        for cell in range(self.n_layers):
-            for node in range(self.n_nodes):
-                for edge in range(2+node):
-                    feature = mixed_cell_feature[cell]["node{}_edge{}".format(node, edge)]
-                    std_mean, gstd_mean = utils.compute_group_std(feature, indices)
-                    loss += std_mean + 1/gstd_mean
-                    iteration += 1
-        loss /= iteration
-        
-        return loss
-    
-    def save_features(self, path, curr_epoch):
+    def _save_features(self, path, curr_epoch):
         mixed_cell_feature = self.net.mixed_cell_feature()
         dir_epoch = os.path.join(path, "features", str(curr_epoch))
         os.system("mkdir -p {}".format(dir_epoch))

@@ -61,6 +61,7 @@ class SearchConfig(BaseConfig):
         parser.add_argument('--alpha_lr', type=float, default=3e-4, help='lr for alpha')
         parser.add_argument('--alpha_weight_decay', type=float, default=1e-3, help='weight decay for alpha')
         parser.add_argument('--feature_epoch', type=str, default='0', help='saved feature at specific epoch')
+        parser.add_argument('--anchor', type=bool, default=True, help='anchor for cluster loss')
 
         return parser
 

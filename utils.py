@@ -141,7 +141,7 @@ def _data_transforms_cifar10(args):
         ])
     return train_transform, valid_transform
 
-def compute_group_std(feature_list, indices):
+def compute_group_std(feature_list, indices, anchor):
     groups = []
     # Divide the list into groups based on the indices
     start = 0
@@ -153,6 +153,24 @@ def compute_group_std(feature_list, indices):
     # Include the remaining elements after the last specified index
     if start < len(feature_list):
         groups.append(feature_list[start:])
+    
+    if anchor == True:
+        # Distance for in group elements
+        group_distance = 0
+        anchor_distance = 0
+        
+        for group in groups:
+            for elem in range(1, len(group)):
+                anchor_distance = (group[elem] - group[0]).pow(2).sum(1).sqrt()
+                group_distance += anchor_distance
+            group_distance /= len(group) - 1
+        group_distance /= len(groups)
+        
+        for group in groups:
+            
+            
+        return
+    
     
     # Calculate the mean and std value in each group
     # To make same group's feature closer
@@ -179,7 +197,7 @@ def compute_group_std(feature_list, indices):
         std_mean = torch.mean(std).item()
         group_stds.append(std_mean)
     
-    
+
     # Calculate std of every group's mean value
     # To make different group's feature farther
     gvar = 0
