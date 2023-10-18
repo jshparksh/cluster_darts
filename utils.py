@@ -167,7 +167,7 @@ def compute_group_std(feature_list, indices, anchor):
             group_distance /= len(group) - 1
         group_distance /= len(groups)
         
-        anchor_center = torch.mean(torch.stack(anchor_list))
+        anchor_center = torch.mean(torch.stack(anchor_list), dim=0)
         for anchor in anchor_list:
             anchor_distance += (anchor - anchor_center).pow(2).sum().sqrt()
         anchor_distance /= len(anchor_list)
@@ -183,23 +183,21 @@ def compute_group_std(feature_list, indices, anchor):
             # Initialize values for each group
             mean_list = []
             group_mean = 0
-            var = 0
-            std = 0
+            group_var = 0
+            group_std = 0
             
             for elem in range(len(group)): # elem is index in the group
-                mean = torch.mean(group[elem], dim=1) # ex) elem=0 -> mean value of sep_conv_3x3_16bit's feature in channel dim
+                mean = torch.mean(group[elem], dim=0) # ex) elem=0 -> mean value of sep_conv_3x3_16bit's feature by channel dim
                 mean_list.append(mean)
                 group_mean += mean
             group_mean /= len(group)
             group_means.append(group_mean)
             
             for elem in range(len(group)):
-                var += (mean_list[elem]-group_mean).pow(2)
-            var /= len(group)
-            std = torch.sqrt(var)
-            std_mean = torch.mean(std).item()
-            group_stds.append(std_mean)
-        
+                group_var += (mean_list[elem]-group_mean).pow(2)
+            group_var /= len(group)
+            group_std = group_var.sum().sqrt()
+            group_stds.append(group_std)
 
         # Calculate std of every group's mean value
         # To make different group's feature farther
@@ -211,9 +209,8 @@ def compute_group_std(feature_list, indices, anchor):
         group_mean_mean /= len(group_means)
         
         for gm in group_means:
-            gvar += (gm - group_mean_mean)**2
+            gvar += (gm - group_mean_mean).pow(2)
         gvar /= len(group_means)
-        gstd = torch.sqrt(gvar)
-        gstd_mean = torch.mean(gstd).item()
+        gstd = gvar.sum().sqrt()
         
-        return sum(group_stds)/len(group_stds), gstd_mean
+        return sum(group_stds)/len(group_stds), gstd
