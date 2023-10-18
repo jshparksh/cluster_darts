@@ -159,9 +159,7 @@ def compute_group_std(feature_list, indices, anchor):
         group_distance = 0
         anchor_distance = 0
         anchor_list = []
-        
-        print('test_commit')
-        
+                
         for group in groups:
             anchor_list.append(group[0])
             for elem in range(1, len(group)):
