@@ -8,7 +8,7 @@ import utils
 
 from tensorboardX import SummaryWriter
 from config import SearchConfig
-from models.search_cnn import SearchCNNController
+from models.search_cnn import SearchCNN
 from architect import Architect
 from visualize import plot
 
@@ -44,16 +44,20 @@ def main():
     train_data = dset.CIFAR10(root=config.data_path, train=True, download=True, transform=train_transform)
 
     net_crit = nn.CrossEntropyLoss().to(device)
-    model = SearchCNNController(config.init_channels, n_classes, config.layers,
+    model = SearchCNN(config.init_channels, n_classes, config.layers,
                                 net_crit, device_ids=config.gpus)
+    #model = SearchCNNController(config.init_channels, n_classes, config.layers,
+    #                            net_crit, device_ids=config.gpus)
     model = model.to(device)
+    model = torch.nn.DataParallel(model, device_ids = config.gpus)
+    model = model.cuda()
 
     # weights optimizer
-    w_optim = torch.optim.SGD(model.weights(), config.w_lr, momentum=config.w_momentum,
+    w_optim = torch.optim.SGD(model.parameters(), config.w_lr, momentum=config.w_momentum,
                               weight_decay=config.w_weight_decay)
     # alphas optimizer
-    alpha_optim = torch.optim.Adam(model.alphas(), config.alpha_lr, betas=(0.5, 0.999),
-                                   weight_decay=config.alpha_weight_decay)
+    #alpha_optim = torch.optim.Adam(model.alphas(), config.alpha_lr, betas=(0.5, 0.999),
+    #                               weight_decay=config.alpha_weight_decay)
 
     # split data to train/validation
     n_train = len(train_data)
@@ -76,15 +80,14 @@ def main():
     architect = Architect(model, config)
 
     # training loop
-    best_top1 = 0.
     for epoch in range(config.epochs):
         lr_scheduler.step()
         lr = lr_scheduler.get_lr()[0]
 
-        model.print_alphas(logger)
+        model.module.print_alphas(logger)
 
         # training
-        train(train_loader, valid_loader, model, architect, w_optim, alpha_optim, lr, epoch)
+        train(train_loader, valid_loader, model, architect, w_optim, lr, epoch) #alpha_optim,
         """
         # validation
         cur_step = (epoch+1) * len(train_loader)
@@ -92,7 +95,7 @@ def main():
         """
         # log
         # genotype
-        genotype = model.genotype()
+        genotype = model.module.genotype()
         logger.info("genotype = {}".format(genotype))
         with open(os.path.join(config.path, 'genotype.txt'), 'w') as f:
             f.write(str(genotype))
@@ -121,7 +124,7 @@ def main():
     """
 
 
-def train(train_loader, valid_loader, model, architect, w_optim, alpha_optim, lr, epoch):
+def train(train_loader, valid_loader, model, architect, w_optim, lr, epoch): #alpha_optim,
     top1 = utils.AverageMeter()
     top5 = utils.AverageMeter()
     losses = utils.AverageMeter()
@@ -137,21 +140,14 @@ def train(train_loader, valid_loader, model, architect, w_optim, alpha_optim, lr
         N = trn_X.size(0)
 
         # phase 2. architect step (alpha)
-        alpha_optim.zero_grad()
-        architect.unrolled_backward(trn_X, trn_y, val_X, val_y, lr, w_optim)
-        alpha_optim.step()
+        architect.step(trn_X, trn_y, val_X, val_y, lr, w_optim, epoch, unrolled=config.unrolled)
 
         # phase 1. child network step (w)
         w_optim.zero_grad()
         logits = model(trn_X)
         loss = model.criterion(logits, trn_y)
         
-        # cluster loss with lambda 
-        lambda_c = 5
-        cluster_loss = model.cluster_loss() / lambda_c
-        
-        new_loss = loss + cluster_loss
-        new_loss.backward()
+        loss.backward()
         # gradient clipping
         nn.utils.clip_grad_norm_(model.weights(), config.w_grad_clip)
         
@@ -159,15 +155,15 @@ def train(train_loader, valid_loader, model, architect, w_optim, alpha_optim, lr
         alpha_optim.step()
         
         prec1, prec5 = utils.accuracy(logits, trn_y, topk=(1, 5))
-        losses.update(new_loss.item(), N)
+        losses.update(loss.item(), N)
         top1.update(prec1.item(), N)
         top5.update(prec5.item(), N)
 
         if step % config.print_freq == 0 or step == len(train_loader)-1:
             logger.info(
-                "Train: [{:2d}/{}] Step {:03d}/{:03d} Cluster Loss {:.3f} Loss {losses.avg:.3f}"
+                "Train: [{:2d}/{}] Step {:03d}/{:03d} Loss {losses.avg:.3f}"
                 "Prec@(1,5) ({top1.avg:.1%}, {top5.avg:.1%})".format(
-                    epoch + 1, config.epochs, step, len(train_loader) - 1, cluster_loss, losses=losses, 
+                    epoch + 1, config.epochs, step, len(train_loader) - 1, losses=losses, 
                     top1=top1, top5=top5))
 
         writer.add_scalar('train/loss', loss.item(), cur_step)

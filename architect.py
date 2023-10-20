@@ -18,15 +18,9 @@ class Architect(object):
         self.network_weight_decay = config.w_weight_decay
         self.model = model
         self.anchor = config.anchor
-        self.optimizer = torch.optim.Adam(self.model.arch_parameters(),
+        self.optimizer = torch.optim.Adam(self.model.module.arch_parameters(),
                                           lr=config.alpha_lr, betas=(0.5, 0.999),
                                           weight_decay=config.alpha_weight_decay)
-        
-    def _train_loss(self, model, input, target):
-        return model._loss(input, target)
-
-    def _val_loss(self, model, input, target):
-        return model._loss(input, target)
 
     def _compute_unrolled_model(self, input, target, eta, network_optimizer):
         loss = self._train_loss(model=self.model, input=input, target=target)
@@ -48,29 +42,13 @@ class Architect(object):
             self._backward_step(input_valid, target_valid, epoch)
         self.optimizer.step()
 
-    def zero_hot(self, norm_weights):
-        # pos = (norm_weights == norm_weights.max(axis=1, keepdims=1))
-        valid_loss = torch.log(norm_weights)
-        base_entropy = torch.log(torch.tensor(2).float())
-        aux_loss = torch.mean(valid_loss) + base_entropy
-        return aux_loss
-
-    def mlc_loss(self, arch_param):
-        y_pred_neg = arch_param
-        neg_loss = torch.logsumexp(y_pred_neg, dim=-1)
-        aux_loss = torch.mean(neg_loss)
-        return aux_loss
-
     def _backward_step(self, input_valid, target_valid, epoch):
-        weights = 0 + 50*epoch/100
-        ssr_normal = self.mlc_loss(self.model._arch_parameters)
-        loss = self._val_loss(self.model, input_valid, target_valid) + weights*ssr_normal
-        # loss = self._val_loss(self.model, input_valid, target_valid)
+        loss = self._compute_loss(self.model(input_valid), target_valid, epoch)
         loss.backward()
 
     def _backward_step_unrolled(self, input_train, target_train, input_valid, target_valid, eta, network_optimizer):
         unrolled_model = self._compute_unrolled_model(input_train, target_train, eta, network_optimizer)
-        unrolled_loss = self._val_loss(model=unrolled_model, input=input_valid, target=target_valid)
+        unrolled_loss = self._compute_loss(model=unrolled_model, input=input_valid, target=target_valid)
 
         # Compute backwards pass with respect to the unrolled model parameters
         unrolled_loss.backward()
@@ -122,13 +100,18 @@ class Architect(object):
 
         return [(x - y).div_(2 * R) for x, y in zip(grads_p, grads_n)]
     
+    def mlc_loss(self, arch_param):
+        y_pred_neg = arch_param
+        neg_loss = torch.logsumexp(y_pred_neg, dim=-1)
+        aux_loss = torch.mean(neg_loss)
+        return aux_loss
+
     def cluster_loss(self):
         # get output data from MixedOP, flatten and mean value
         loss = 0
         
         op_names = gt.PRIMITIVES
         op_groups = gt.PRIMITIVES_GROUPS
-        num_ops = len(op_names)
         
         # Group indices for seperation
         indices = []
@@ -139,49 +122,43 @@ class Architect(object):
         
         # Calculate mean of std values for loss
         iteration = 0
-        mixed_cell_feature = self.net.mixed_cell_feature()
+        mixed_cell_feature = self.model.mixed_cell_feature()
         for cell in range(self.n_layers):
             for node in range(self.n_nodes):
                 for edge in range(2+node):
                     feature = mixed_cell_feature[cell]["node{}_edge{}".format(node, edge)]
-                    std_mean, gstd_mean = utils.compute_group_std(feature, indices, self.anchor)
-                    loss += std_mean + 1/gstd_mean
-                    iteration += 1
+                    if self.anchor == True:
+                        group_dist, anchor_dist = utils.compute_group_std(feature, indices, self.anchor)
+                        print('group_distance', group_dist)
+                        print('anchor_distance', anchor_dist)
+                        loss += group_dist + 1/anchor_dist
+                        iteration += 1
+                    else:
+                        std, gstd = utils.compute_group_std(feature, indices, self.anchor)
+                        loss += std + 1/gstd
+                        iteration += 1
         loss /= iteration
         
         return loss
     
-    def _compute_loss(self, logits, target, epoch):
-        loss = self.criterion(logits, target)
+    def _compute_loss(self, input_valid, target_valid, epoch):
+        loss = self.model.loss(input_valid, target_valid)
         self.loss = loss
         
-        ssr_normal = self.mlc_loss(self.model._arch_parameters)
+        weights = 0 + 50*epoch/100
+        ssr_normal = self.mlc_loss(self.model.arch_parameters)
         
+        cluster_loss = self.cluster_loss()
+        print('loss', loss)
+        print('ssr_normal', ssr_normal)
+        print('weights*ssr_normal', weights*ssr_normal)
+        print('cluster_loss', cluster_loss)
         
-        latency = self.model.lp
-        lmd1 = 15
-        lmd2 = 100
-        th = 0.0005
+        lmd1 = 1/2
+        lmd2 = 1/2
         
-        C_curr = self.config.init_channels
-        img_size = 32
-        for i in range(self.model._layers):
-            if i in [self.model._layers//3, 2*self.model._layers//3]:
-                C_curr *= 2
-                reduction = True
-                img_size /= 2
-            else:
-                reduction = False
-
-            latency += self.model.latency_point(PRIMITIVES, self.model.genotype(), C_curr, img_size, reduction, self.est)
+        new_loss = lmd1*loss + lmd2*cluster_loss + weights*ssr_normal
         
-        self.lp = latency
-
-        latency *= 2 * (10 ** (-9))
-
-        if epoch <= 8:
-            lmd1 = 0
+        self.final_loss = new_loss
         
-        cost = loss + lmd1 * (math.log(1 + lmd2 * (_step_func(latency - th))))
-        self.final_loss = cost
-        return cost
+        return new_loss

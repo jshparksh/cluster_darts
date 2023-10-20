@@ -50,5 +50,5 @@ fi
 
 printf "docker run --rm --ipc=host --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=$gpu --workdir /app -v "$(pwd)":/app $image python3 -u /app/$python\n"
 printf ""
-#docker run -itd --rm --ipc=host --mount type=bind,source=/dataset,target=/dataset,readonly --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=$gpu --workdir /app --name js_test_container0 -v "$(pwd)":/app $image /bin/bash
-docker run -itd --rm --ipc=host --mount type=bind,source=/dataset,target=/dataset,readonly --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=$gpu --workdir /app --name js_cluster_darts -v "$(pwd)":/app $image python3 -u /app/$python
+docker run -itd --rm --ipc=host --mount type=bind,source=/dataset,target=/dataset,readonly --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=$gpu --workdir /app --name js_test_container0 -v "$(pwd)":/app $image /bin/bash
+#docker run -itd --rm --ipc=host --mount type=bind,source=/dataset,target=/dataset,readonly --runtime=nvidia -e NVIDIA_VISIBLE_DEVICES=$gpu --workdir /app --name js_cluster_darts -v "$(pwd)":/app $image python3 -u /app/$python

@@ -7,17 +7,9 @@ import logging
 import utils
 import os
 
+from torch.autograd import Variable
 from models.search_cells import SearchCell
-from torch.nn.parallel._functions import Broadcast
 from feature_map import save_features
-
-
-def broadcast_list(l, device_ids):
-    """ Broadcasting list """
-    l_copies = Broadcast.apply(device_ids, *l)
-    l_copies = [l_copies[i:i+len(l)] for i in range(0, len(l_copies), len(l))]
-
-    return l_copies
 
 
 class SearchCNN(nn.Module):
@@ -37,27 +29,15 @@ class SearchCNN(nn.Module):
         self.n_classes = n_classes
         self.n_layers = n_layers
         self.criterion = criterion
+        self.n_nodes = n_nodes
+        
         if device_ids is None:
             device_ids = list(range(torch.cuda.device_count()))
         self.device_ids = device_ids
         
         self._mixed_cell_feature = [0] * n_layers
-
-        # initialize architect parameters: alphas
-        n_ops = len(gt.PRIMITIVES)
-
-        self.alpha_normal = nn.ParameterList()
-        self.alpha_reduce = nn.ParameterList()
-
-        for i in range(n_nodes):
-            self.alpha_normal.append(nn.Parameter(1e-3*torch.randn(i+2, n_ops)))
-            self.alpha_reduce.append(nn.Parameter(1e-3*torch.randn(i+2, n_ops)))
-
-        # setup alphas list
-        self._alphas = []
-        for n, p in self.named_parameters():
-            if 'alpha' in n:
-                self._alphas.append((n, p))
+        
+        self._initialize_alphas()
         
         C_cur = stem_multiplier * C
         self.stem = nn.Sequential(
@@ -143,21 +123,30 @@ class SearchCNN(nn.Module):
                            reduce=gene_reduce, reduce_concat=concat)
 
     def weights(self):
-        return self.net.parameters()
+        return self.parameters()
 
     def named_weights(self):
-        return self.net.named_parameters()
+        return self.named_parameters()
 
-    def alphas(self):
-        for n, p in self._alphas:
-            yield p
+    def _initialize_alphas(self):
+        # initialize architect parameters: alphas
+        k = sum(1 for i in range(self.n_nodes) for n in range(2+i))
+        n_ops = len(gt.PRIMITIVES)
 
-    def named_alphas(self):
-        for n, p in self._alphas:
-            yield n, p
+        self.alpha_normal = Variable(1e-3*torch.randn(k, n_ops).cuda(), requires_grad=True)
+        self.alpha_reduce = Variable(1e-3*torch.randn(k, n_ops).cuda(), requires_grad=True)
 
+        # setup alphas list
+        self._arch_parameters = [
+            self.alpha_normal,
+            self.alpha_reduce
+        ]
+    
+    def arch_parameters(self):
+        return self._arch_parameters
+    
     def _save_features(self, path, curr_epoch):
-        mixed_cell_feature = self.net.mixed_cell_feature()
+        mixed_cell_feature = self.mixed_cell_feature()
         dir_epoch = os.path.join(path, "features", str(curr_epoch))
         os.system("mkdir -p {}".format(dir_epoch))
         for cell in range(self.n_layers):

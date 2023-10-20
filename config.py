@@ -62,6 +62,7 @@ class SearchConfig(BaseConfig):
         parser.add_argument('--alpha_weight_decay', type=float, default=1e-3, help='weight decay for alpha')
         parser.add_argument('--feature_epoch', type=str, default='0', help='saved feature at specific epoch')
         parser.add_argument('--anchor', type=bool, default=True, help='anchor for cluster loss')
+        parser.add_argument('--unrolled', action='store_true', default=False, help='use one-step unrolled validation loss')
 
         return parser
 
@@ -70,7 +71,7 @@ class SearchConfig(BaseConfig):
         args = parser.parse_args()
         super().__init__(**vars(args))
 
-        self.data_path = os.path.join('/dataset/', self.dataset)
+        self.data_path = os.path.join('/data/', self.dataset)
         self.path = os.path.join('searchs', self.name)
         self.plot_path = os.path.join(self.path, 'plots')
         self.gpus = parse_gpus(self.gpus)
