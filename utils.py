@@ -141,7 +141,7 @@ def _data_transforms_cifar10(args):
         ])
     return train_transform, valid_transform
 
-def compute_group_std(feature_list, indices, global_max_lmd, global_min_lmd, anchor):
+def compute_group_std(feature_list, indices, anchor):
     groups = []
     # Divide the list into groups based on the indices
     start = 0
@@ -178,21 +178,7 @@ def compute_group_std(feature_list, indices, global_max_lmd, global_min_lmd, anc
         anchor_distance /= len(anchor_list)
         
         return group_distance, anchor_distance
-        """
-        if global_max_lmd < group_distance:
-            max_lmd = group_distance.clone()
-        else:
-            max_lmd = global_max_lmd.clone()
-        if global_min_lmd > anchor_distance:
-            min_lmd = anchor_distance.clone()
-        else:
-            min_lmd = global_min_lmd.clone()
-
-        norm_group_distance = group_distance / max_lmd
-        norm_anchor_distance = anchor_distance / min_lmd
         
-        return norm_group_distance, norm_anchor_distance, max_lmd, min_lmd
-        """
             
     else:
         # Calculate the mean and std value in each group
@@ -233,4 +219,4 @@ def compute_group_std(feature_list, indices, global_max_lmd, global_min_lmd, anc
         gvar /= len(group_means)
         gstd = gvar.sum().sqrt()
         
-        return sum(group_stds)/len(group_stds), gstd, max_lmd, min_lmd
+        return sum(group_stds)/len(group_stds), gstd

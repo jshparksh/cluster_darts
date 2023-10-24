@@ -112,8 +112,6 @@ class Architect(object):
     def cluster_loss(self):
         # get output data from MixedOP, flatten and mean value
         loss = 0
-        
-        op_names = gt.PRIMITIVES
         op_groups = gt.PRIMITIVES_GROUPS
         
         # Group indices for seperation
@@ -131,29 +129,21 @@ class Architect(object):
                 for edge in range(2+node):
                     feature = mixed_cell_feature[cell]["node{}_edge{}".format(node, edge)]
                     if self.anchor == 'True':
-                        group_dist, anchor_dist = utils.compute_group_std(feature, indices, self.max_lmd, self.min_lmd, self.anchor)
-                        #group_dist, anchor_dist, max_lmd, min_lmd = utils.compute_group_std(feature, indices, self.max_lmd, self.min_lmd, self.anchor)
-                        #self.max_lmd = max_lmd
-                        #self.min_lmd = min_lmd
-                        print('before_max_lmd', self.max_lmd)
-                        print('before_min_lmd', self.min_lmd)
+                        group_dist, anchor_dist = utils.compute_group_std(feature, indices, self.anchor)
                         if group_dist > self.max_lmd:
                             self.max_lmd = group_dist
                         if anchor_dist < self.min_lmd:
                             self.min_lmd = anchor_dist
-                        print('after_max_lmd', self.max_lmd)
-                        print('after_min_lmd', self.min_lmd)
                         
-                        loss += group_dist/self.max_lmd + self.min_lmd/anchor_dist
-                        #loss += group_dist + 1/anchor_dist
+                        loss += group_dist/self.max_lmd.detach()+ self.min_lmd.detach()/anchor_dist
                         iteration += 1
                     else:
-                        std, gstd, max_lmd, min_lmd = utils.compute_group_std(feature, indices, self.anchor)
+                        std, gstd = utils.compute_group_std(feature, indices, self.anchor)
                         if std > self.max_lmd:
                             self.max_lmd = std
                         if gstd < self.min_lmd:
                             self.min_lmd = gstd
-                        loss += std/self.max_lmd + self.min_lmd/gstd
+                        loss += std/self.max_lmd.detach() + self.min_lmd.detach()/gstd
                         iteration += 1
         loss /= iteration
         
@@ -164,12 +154,12 @@ class Architect(object):
         self.loss = loss
         
         weights = 0 + 50*epoch/100
-        #ssr_normal = self.mlc_loss(self.model.arch_parameters)
+        ssr_normal = self.mlc_loss(self.model.arch_parameters)
         
         cluster_loss = self.cluster_loss()
         print('loss', loss)
-        #print('ssr_normal', ssr_normal)
-        #print('weights*ssr_normal', weights*ssr_normal)
+        print('ssr_normal', ssr_normal)
+        print('weights*ssr_normal', weights*ssr_normal)
         print('cluster_loss', cluster_loss)
         if self.anchor == 'True':
             lmd = 1
