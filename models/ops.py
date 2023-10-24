@@ -12,23 +12,29 @@ OPS = {
     #'avg_pool_3x3': lambda C, stride, affine: PoolBN('avg', C, 3, stride, 1, affine=affine),
     'max_pool_3x3': lambda C, stride, affine: PoolBN('max', C, 3, stride, 1, affine=affine),
     'skip_connect': lambda C, stride, affine: Identity() if stride == 1 else FactorizedReduce(C, C, affine=affine),
+    'sep_conv_3x3_16' : lambda C, stride, affine: SepConvQ(C, C, kernel_size=3, stride=stride, padding=1, 
+                        num_bits=16, num_bits_weight=16, num_bits_grad=16, affine=affine),
     'sep_conv_3x3_8' : lambda C, stride, affine: SepConvQ(C, C, kernel_size=3, stride=stride, padding=1, 
                         num_bits=8, num_bits_weight=8, num_bits_grad=8, affine=affine),
     'sep_conv_3x3_4' : lambda C, stride, affine: SepConvQ(C, C, kernel_size=3, stride=stride, padding=1, 
                         num_bits=4, num_bits_weight=4, num_bits_grad=4, affine=affine),
-    'sep_conv_5x5_8' : lambda C, stride, affine: SepConvQ(C, C, kernel_size=5, stride=stride, padding=2, 
-                        num_bits=8, num_bits_weight=8, num_bits_grad=8, affine=affine),
-    'sep_conv_5x5_4' : lambda C, stride, affine: SepConvQ(C, C, kernel_size=5, stride=stride, padding=2, 
-                        num_bits=4, num_bits_weight=4, num_bits_grad=4, affine=affine),
+    'dil_conv_3x3_16' : lambda C, stride, affine: DilConvQ(C, C, 3, stride, 2, 2, 
+                        num_bits=16, num_bits_weight=16, num_bits_grad=16, affine=affine),
     'dil_conv_3x3_8' : lambda C, stride, affine: DilConvQ(C, C, 3, stride, 2, 2, 
                         num_bits=8, num_bits_weight=8, num_bits_grad=8, affine=affine),
     'dil_conv_3x3_4' : lambda C, stride, affine: DilConvQ(C, C, 3, stride, 2, 2, 
+                        num_bits=4, num_bits_weight=4, num_bits_grad=4, affine=affine)
+}
+"""
+    'sep_conv_5x5_8' : lambda C, stride, affine: SepConvQ(C, C, kernel_size=5, stride=stride, padding=2, 
+                        num_bits=8, num_bits_weight=8, num_bits_grad=8, affine=affine),
+    'sep_conv_5x5_4' : lambda C, stride, affine: SepConvQ(C, C, kernel_size=5, stride=stride, padding=2, 
                         num_bits=4, num_bits_weight=4, num_bits_grad=4, affine=affine),
     'dil_conv_5x5_8' : lambda C, stride, affine: DilConvQ(C, C, 5, stride, 4, 2, 
                         num_bits=8, num_bits_weight=8, num_bits_grad=8, affine=affine),
     'dil_conv_5x5_4' : lambda C, stride, affine: DilConvQ(C, C, 5, stride, 4, 2, 
                         num_bits=4, num_bits_weight=4, num_bits_grad=4, affine=affine),
-}
+"""
 
 def drop_path_(x, drop_prob, training):
     if training and drop_prob > 0.:
@@ -245,7 +251,11 @@ class MixedOp(nn.Module):
             weights: weight for each operation
         """
         self._feature = [op(x) for op in self._ops]
-        
+        """
+        for w, op in zip(weights, self._ops):
+            print('w', w)
+            print('op', op)
+        """
         return sum(w * op(x) for w, op in zip(weights, self._ops))
     
     def feature(self):

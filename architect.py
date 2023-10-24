@@ -13,14 +13,17 @@ def _concat(xs):
 
 class Architect(object):
 
-    def __init__(self, model, config):
+    def __init__(self, model, criterion, config):
         self.network_momentum = config.w_momentum
         self.network_weight_decay = config.w_weight_decay
         self.model = model
+        self.criterion = criterion
+        self.max_lmd = torch.nn.Parameter(torch.tensor(0.0, dtype= torch.float32, requires_grad=False)).cuda()
+        self.min_lmd = torch.nn.Parameter(torch.tensor(10000, dtype= torch.float32, requires_grad=False)).cuda()
         self.anchor = config.anchor
-        self.optimizer = torch.optim.Adam(self.model.module.arch_parameters(),
+        self.optimizer = torch.optim.Adam(self.model.arch_parameters(),
                                           lr=config.alpha_lr, betas=(0.5, 0.999),
-                                          weight_decay=config.alpha_weight_decay)
+                                          weight_decay=0.)
 
     def _compute_unrolled_model(self, input, target, eta, network_optimizer):
         loss = self._train_loss(model=self.model, input=input, target=target)
@@ -44,7 +47,7 @@ class Architect(object):
 
     def _backward_step(self, input_valid, target_valid, epoch):
         loss = self._compute_loss(self.model(input_valid), target_valid, epoch)
-        loss.backward()
+        loss.backward(retain_graph=True)
 
     def _backward_step_unrolled(self, input_train, target_train, input_valid, target_valid, eta, network_optimizer):
         unrolled_model = self._compute_unrolled_model(input_train, target_train, eta, network_optimizer)
@@ -123,42 +126,59 @@ class Architect(object):
         # Calculate mean of std values for loss
         iteration = 0
         mixed_cell_feature = self.model.mixed_cell_feature()
-        for cell in range(self.n_layers):
-            for node in range(self.n_nodes):
+        for cell in range(self.model.n_layers):
+            for node in range(self.model.n_nodes):
                 for edge in range(2+node):
                     feature = mixed_cell_feature[cell]["node{}_edge{}".format(node, edge)]
-                    if self.anchor == True:
-                        group_dist, anchor_dist = utils.compute_group_std(feature, indices, self.anchor)
-                        print('group_distance', group_dist)
-                        print('anchor_distance', anchor_dist)
-                        loss += group_dist + 1/anchor_dist
+                    if self.anchor == 'True':
+                        group_dist, anchor_dist = utils.compute_group_std(feature, indices, self.max_lmd, self.min_lmd, self.anchor)
+                        #group_dist, anchor_dist, max_lmd, min_lmd = utils.compute_group_std(feature, indices, self.max_lmd, self.min_lmd, self.anchor)
+                        #self.max_lmd = max_lmd
+                        #self.min_lmd = min_lmd
+                        print('before_max_lmd', self.max_lmd)
+                        print('before_min_lmd', self.min_lmd)
+                        if group_dist > self.max_lmd:
+                            self.max_lmd = group_dist
+                        if anchor_dist < self.min_lmd:
+                            self.min_lmd = anchor_dist
+                        print('after_max_lmd', self.max_lmd)
+                        print('after_min_lmd', self.min_lmd)
+                        
+                        loss += group_dist/self.max_lmd + self.min_lmd/anchor_dist
+                        #loss += group_dist + 1/anchor_dist
                         iteration += 1
                     else:
-                        std, gstd = utils.compute_group_std(feature, indices, self.anchor)
-                        loss += std + 1/gstd
+                        std, gstd, max_lmd, min_lmd = utils.compute_group_std(feature, indices, self.anchor)
+                        if std > self.max_lmd:
+                            self.max_lmd = std
+                        if gstd < self.min_lmd:
+                            self.min_lmd = gstd
+                        loss += std/self.max_lmd + self.min_lmd/gstd
                         iteration += 1
         loss /= iteration
         
         return loss
     
     def _compute_loss(self, input_valid, target_valid, epoch):
-        loss = self.model.loss(input_valid, target_valid)
+        loss = self.criterion(input_valid, target_valid)
         self.loss = loss
         
         weights = 0 + 50*epoch/100
-        ssr_normal = self.mlc_loss(self.model.arch_parameters)
+        #ssr_normal = self.mlc_loss(self.model.arch_parameters)
         
         cluster_loss = self.cluster_loss()
         print('loss', loss)
-        print('ssr_normal', ssr_normal)
-        print('weights*ssr_normal', weights*ssr_normal)
+        #print('ssr_normal', ssr_normal)
+        #print('weights*ssr_normal', weights*ssr_normal)
         print('cluster_loss', cluster_loss)
-        
-        lmd1 = 1/2
-        lmd2 = 1/2
-        
-        new_loss = lmd1*loss + lmd2*cluster_loss + weights*ssr_normal
+        if self.anchor == 'True':
+            lmd = 1
+            new_loss = loss + cluster_loss# + weights*ssr_normal
+            
+        else:
+            lmd = 1
+            new_loss = loss + cluster_loss# + weights*ssr_normal
         
         self.final_loss = new_loss
-        
+        print('new_loss', new_loss)
         return new_loss

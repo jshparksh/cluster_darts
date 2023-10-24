@@ -43,18 +43,20 @@ def main():
     train_transform, valid_transform = utils._data_transforms_cifar10(config)
     train_data = dset.CIFAR10(root=config.data_path, train=True, download=True, transform=train_transform)
 
-    net_crit = nn.CrossEntropyLoss().to(device)
+    criterion = nn.CrossEntropyLoss().cuda()
     model = SearchCNN(config.init_channels, n_classes, config.layers,
-                                net_crit, device_ids=config.gpus)
+                                criterion) #, device_ids=config.gpus)
     #model = SearchCNNController(config.init_channels, n_classes, config.layers,
     #                            net_crit, device_ids=config.gpus)
-    model = model.to(device)
-    model = torch.nn.DataParallel(model, device_ids = config.gpus)
-    model = model.cuda()
-
+    #model = model.to(device)
+    if len(config.gpus) > 1:
+        model = nn.DataParallel(model, device_ids = config.gpus)
+        model = model.cuda()
+    else:
+        model = model.cuda()
     # weights optimizer
     w_optim = torch.optim.SGD(model.parameters(), config.w_lr, momentum=config.w_momentum,
-                              weight_decay=config.w_weight_decay)
+                              weight_decay=0.)
     # alphas optimizer
     #alpha_optim = torch.optim.Adam(model.alphas(), config.alpha_lr, betas=(0.5, 0.999),
     #                               weight_decay=config.alpha_weight_decay)
@@ -76,15 +78,15 @@ def main():
     
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         w_optim, config.epochs, eta_min=config.w_lr_min)
+        
+    architect = Architect(model, criterion, config)
     
-    architect = Architect(model, config)
-
     # training loop
     for epoch in range(config.epochs):
         lr_scheduler.step()
         lr = lr_scheduler.get_lr()[0]
 
-        model.module.print_alphas(logger)
+        model.print_alphas(logger)
 
         # training
         train(train_loader, valid_loader, model, architect, w_optim, lr, epoch) #alpha_optim,
@@ -95,7 +97,7 @@ def main():
         """
         # log
         # genotype
-        genotype = model.module.genotype()
+        genotype = model.genotype()
         logger.info("genotype = {}".format(genotype))
         with open(os.path.join(config.path, 'genotype.txt'), 'w') as f:
             f.write(str(genotype))
@@ -152,7 +154,6 @@ def train(train_loader, valid_loader, model, architect, w_optim, lr, epoch): #al
         nn.utils.clip_grad_norm_(model.weights(), config.w_grad_clip)
         
         w_optim.step()
-        alpha_optim.step()
         
         prec1, prec5 = utils.accuracy(logits, trn_y, topk=(1, 5))
         losses.update(loss.item(), N)
@@ -172,7 +173,7 @@ def train(train_loader, valid_loader, model, architect, w_optim, lr, epoch): #al
         cur_step += 1
         if cur_step == 3:
             break
-    model.save_features(config.path, epoch)
+    model._save_features(config.path, epoch)
 
     logger.info("Train: [{:2d}/{}] Final Prec@1 {:.4%}".format(epoch+1, config.epochs, top1.avg))
 

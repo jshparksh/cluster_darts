@@ -13,26 +13,25 @@ from collections import namedtuple
 Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
 
 PRIMITIVES = [
+    'sep_conv_3x3_16',
     'sep_conv_3x3_8',
     'sep_conv_3x3_4',
-    'sep_conv_5x5_4',
+    'dil_conv_3x3_16',
     'dil_conv_3x3_8',
     'dil_conv_3x3_4',
-    'dil_conv_5x5_4',
     'max_pool_3x3',
-    #'avg_pool_3x3',  # deleted in `1-skip` search space, replaced by `skip-connect` in `3-skip` search space
     'skip_connect',
     'none',
-]
+] #'avg_pool_3x3',  # deleted in `1-skip` search space, replaced by `skip-connect` in `3-skip` search space
 PRIMITIVES_GROUPS = [
     [
+    'sep_conv_3x3_16',
     'sep_conv_3x3_8',
-    'sep_conv_3x3_4',
-    'sep_conv_5x5_4'],
+    'sep_conv_3x3_4'],
     [
+    'dil_conv_3x3_16',
     'dil_conv_3x3_8',
-    'dil_conv_3x3_4',
-    'dil_conv_5x5_4'],
+    'dil_conv_3x3_4'],
     [
     'max_pool_3x3',
     #'avg_pool_3x3',  # deleted in `1-skip` search space, replaced by `skip-connect` in `3-skip` search space
@@ -119,7 +118,7 @@ def parse(alpha, k):
         gene.append(node_gene)
 
     return gene
-
+"""
 def save_alphas(alphas, primitives, save_dir, epoch=None, is_best=False):
     if epoch is not None:
         alpha_file = os.path.join(save_dir, "alphas_{}.pk".format(epoch))
@@ -150,3 +149,4 @@ def save_alphas(alphas, primitives, save_dir, epoch=None, is_best=False):
                       save_dir=os.path.join(save_dir, "dags"))
 
     return genotypes
+"""

@@ -8,7 +8,7 @@ class SearchCell(nn.Module):
     """ Cell for search
     Each edge is mixed and continuous relaxed.
     """
-    def __init__(self, n_nodes, C_pp, C_p, C, reduction_p, reduction): #, cell_id):
+    def __init__(self, n_nodes, multiplier, C_pp, C_p, C, reduction_p, reduction): #, cell_id):
         """
         Args:
             n_nodes: # of intermediate n_nodes
@@ -21,6 +21,7 @@ class SearchCell(nn.Module):
         super().__init__()
         self.reduction = reduction
         self.n_nodes = n_nodes
+        self.multiplier = multiplier
         self._mixed_op_feature = {}
 
         # If previous cell is reduction cell, current input size does not match with
@@ -39,7 +40,7 @@ class SearchCell(nn.Module):
                 # reduction should be used only for input node
                 stride = 2 if reduction and j < 2 else 1
                 op = ops.MixedOp(C, stride) #, cell_id, i, j) #i=node_id, j=edge_id maybe for visualization
-                self.dag[i].append(op)
+                self.dag[i].append(op) # self.dag.append(op)
         self._mixed_op_feature = self.mixed_op_feature()
 
     def forward(self, s0, s1, w_dag):
@@ -47,17 +48,25 @@ class SearchCell(nn.Module):
         s1 = self.preproc1(s1)
 
         states = [s0, s1]
+        """
+        offset = 0
+        for i in range(self.n_nodes):
+            s = sum(self.dag[offset+j](h, w_dag[offset+j]) for j, h in enumerate(states))
+            offset += len(states)
+            states.append(s)
+        """
+            
         for edges, w_list in zip(self.dag, w_dag):
             s_cur = sum(edges[i](s, w) for i, (s, w) in enumerate(zip(states, w_list)))
             states.append(s_cur)
-
+        
         for i in range(self.n_nodes):
             for j in range(2+i):
                 feature_str = "node{}_edge{}".format(i, j)
                 self._mixed_op_feature[feature_str] = self.dag[i][j].feature() #ops.MixedOp().feature()
                 
-        s_out = torch.cat(states[2:], dim=1)
-        return s_out
+        
+        return torch.cat(states[-self.multiplier:], dim=1)
 
     def mixed_op_feature(self):
         return self._mixed_op_feature

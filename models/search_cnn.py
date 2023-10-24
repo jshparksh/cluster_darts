@@ -14,7 +14,7 @@ from feature_map import save_features
 
 class SearchCNN(nn.Module):
     """ Search CNN model """
-    def __init__(self, C, n_classes, n_layers, criterion, n_nodes=4, stem_multiplier=3, device_ids=None):
+    def __init__(self, C, n_classes, n_layers, criterion, n_nodes=4, multiplier=4, stem_multiplier=3): #, device_ids=None):
         """
         Args:
             C_in: # of input channels
@@ -30,11 +30,12 @@ class SearchCNN(nn.Module):
         self.n_layers = n_layers
         self.criterion = criterion
         self.n_nodes = n_nodes
-        
+        self.multiplier = multiplier
+        """
         if device_ids is None:
             device_ids = list(range(torch.cuda.device_count()))
         self.device_ids = device_ids
-        
+        """
         self._mixed_cell_feature = [0] * n_layers
         
         self._initialize_alphas()
@@ -59,7 +60,7 @@ class SearchCNN(nn.Module):
             else:
                 reduction = False
 
-            cell = SearchCell(n_nodes, C_pp, C_p, C_cur, reduction_p, reduction) #, i)
+            cell = SearchCell(n_nodes, multiplier, C_pp, C_p, C_cur, reduction_p, reduction) #, i)
             reduction_p = reduction
             self.cells.append(cell)
             C_cur_out = C_cur * n_nodes
@@ -71,14 +72,22 @@ class SearchCNN(nn.Module):
         
     def forward(self, x):
         s0 = s1 = self.stem(x)
-
+        """
+        for i, cell in enumerate(self.cells):
+            if cell.reduction:
+                weights = F.softmax(self.alpha_reduce, dim=-1)
+            else:
+                weights = F.softmax(self.alpha_normal, dim=-1)
+            s0, s1 = s1, cell(s0, s1, weights)
+        """
+        
         weights_normal = [F.softmax(alpha, dim=-1) for alpha in self.alpha_normal]
         weights_reduce = [F.softmax(alpha, dim=-1) for alpha in self.alpha_reduce]
 
         for cell in self.cells:
             weights = weights_reduce if cell.reduction else weights_normal
             s0, s1 = s1, cell(s0, s1, weights)
-
+        
         out = self.gap(s1)
         out = out.view(out.size(0), -1) # flatten
         logits = self.linear(out)
@@ -88,11 +97,11 @@ class SearchCNN(nn.Module):
         for i in range(len(self.cells)):
             self._mixed_cell_feature[i] = self.cells[i].mixed_op_feature()
         return self._mixed_cell_feature
-
+    """
     def loss(self, X, y):
         logits = self.forward(X)
         return self.criterion(logits, y)
-
+    """
     def print_alphas(self, logger):
         # remove formats
         org_formatters = []
@@ -130,20 +139,29 @@ class SearchCNN(nn.Module):
 
     def _initialize_alphas(self):
         # initialize architect parameters: alphas
+        """
         k = sum(1 for i in range(self.n_nodes) for n in range(2+i))
+        
+        self.alpha_normal = nn.Parameter(1e-3*torch.randn(k, n_ops).cuda())
+        self.alpha_reduce = nn.Parameter(1e-3*torch.randn(k, n_ops).cuda())
+        """
         n_ops = len(gt.PRIMITIVES)
 
-        self.alpha_normal = Variable(1e-3*torch.randn(k, n_ops).cuda(), requires_grad=True)
-        self.alpha_reduce = Variable(1e-3*torch.randn(k, n_ops).cuda(), requires_grad=True)
-
-        # setup alphas list
-        self._arch_parameters = [
-            self.alpha_normal,
-            self.alpha_reduce
-        ]
+        self.alpha_normal = nn.ParameterList()
+        self.alpha_reduce = nn.ParameterList()
+        
+        for i in range(self.n_nodes):
+            self.alpha_normal.append(nn.Parameter(1e-3*torch.randn(i+2, n_ops)))
+            self.alpha_reduce.append(nn.Parameter(1e-3*torch.randn(i+2, n_ops)))
+        
+        self._arch_parameters = []
+        for n, p in self.named_parameters():
+            if 'alpha' in n:
+                self._arch_parameters.append((n, p))
     
     def arch_parameters(self):
-        return self._arch_parameters
+        for n, p in self._arch_parameters:
+            yield p
     
     def _save_features(self, path, curr_epoch):
         mixed_cell_feature = self.mixed_cell_feature()
