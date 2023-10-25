@@ -251,11 +251,7 @@ class MixedOp(nn.Module):
             weights: weight for each operation
         """
         self._feature = [op(x) for op in self._ops]
-        """
-        for w, op in zip(weights, self._ops):
-            print('w', w)
-            print('op', op)
-        """
+        
         return sum(w * op(x) for w, op in zip(weights, self._ops))
     
     def feature(self):

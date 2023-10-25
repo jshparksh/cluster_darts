@@ -47,7 +47,7 @@ class Architect(object):
 
     def _backward_step(self, input_valid, target_valid, epoch):
         loss = self._compute_loss(self.model(input_valid), target_valid, epoch)
-        loss.backward(retain_graph=True)
+        loss.backward() #retain_graph=True)
 
     def _backward_step_unrolled(self, input_train, target_train, input_valid, target_valid, eta, network_optimizer):
         unrolled_model = self._compute_unrolled_model(input_train, target_train, eta, network_optimizer)
@@ -105,7 +105,7 @@ class Architect(object):
     
     def mlc_loss(self, arch_param):
         y_pred_neg = arch_param
-        neg_loss = torch.logsumexp(y_pred_neg, dim=-1)
+        neg_loss = torch.logsumexp(y_pred_neg, -1)
         aux_loss = torch.mean(neg_loss)
         return aux_loss
 

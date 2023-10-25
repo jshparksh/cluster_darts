@@ -154,6 +154,7 @@ class SearchCNN(nn.Module):
             self.alpha_normal.append(nn.Parameter(1e-3*torch.randn(i+2, n_ops)))
             self.alpha_reduce.append(nn.Parameter(1e-3*torch.randn(i+2, n_ops)))
         
+        self._alphas = [self.alpha_normal, self.alpha_reduce]
         self._arch_parameters = []
         for n, p in self.named_parameters():
             if 'alpha' in n:
