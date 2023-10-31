@@ -86,7 +86,7 @@ def main():
         lr_scheduler.step()
         lr = lr_scheduler.get_lr()[0]
 
-        model.print_alphas(logger)
+        model.module.print_alphas(logger)
 
         # training
         train(train_loader, valid_loader, model, architect, w_optim, lr, epoch) #alpha_optim,

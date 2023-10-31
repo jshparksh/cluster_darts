@@ -21,7 +21,7 @@ class Architect(object):
         self.max_lmd = torch.nn.Parameter(torch.tensor(0.0, dtype= torch.float32, requires_grad=False)).cuda()
         self.min_lmd = torch.nn.Parameter(torch.tensor(10000, dtype= torch.float32, requires_grad=False)).cuda()
         self.anchor = config.anchor
-        self.optimizer = torch.optim.Adam(self.model.arch_parameters(),
+        self.optimizer = torch.optim.Adam(self.model.module.arch_parameters(),
                                           lr=config.alpha_lr, betas=(0.5, 0.999),
                                           weight_decay=0.)
 
