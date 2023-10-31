@@ -8,7 +8,7 @@ import utils
 
 from tensorboardX import SummaryWriter
 from config import SearchConfig
-from models.search_cnn import SearchCNN
+from models.search_cnn import SearchCNNController
 from architect import Architect
 from visualize import plot
 
@@ -30,7 +30,7 @@ def main():
     logger.info("Logger is set - training start")
 
     # set default gpu device id
-    torch.cuda.set_device(config.gpus[0])
+    #torch.cuda.set_device(config.gpus[0])
 
     # set seed
     np.random.seed(config.seed)
@@ -40,20 +40,24 @@ def main():
     torch.backends.cudnn.benchmark = True
 
     # get data with meta info
+    input_size, input_channels, n_classes, train_data = utils.get_data(
+        config.dataset, config.data_path, cutout_length=0, validation=False)
+    
     train_transform, valid_transform = utils._data_transforms_cifar10(config)
     train_data = dset.CIFAR10(root=config.data_path, train=True, download=True, transform=train_transform)
 
     criterion = nn.CrossEntropyLoss().cuda()
-    model = SearchCNN(config.init_channels, n_classes, config.layers,
-                                criterion) #, device_ids=config.gpus)
-    #model = SearchCNNController(config.init_channels, n_classes, config.layers,
-    #                            net_crit, device_ids=config.gpus)
+    #model = SearchCNN(config.init_channels, n_classes, config.layers,
+    #                            criterion) #, device_ids=config.gpus)
+    model = SearchCNNController(input_size, input_channels, config.init_channels, n_classes, config.layers,
+                                criterion, device_ids=config.gpus)
+    model = model.cuda()
     #model = model.to(device)
-    if len(config.gpus) > 1:
+    """if len(config.gpus) > 1:
         model = nn.DataParallel(model, device_ids = config.gpus)
         model = model.cuda()
     else:
-        model = model.cuda()
+        model = model.cuda()"""
     # weights optimizer
     w_optim = torch.optim.SGD(model.parameters(), config.w_lr, momentum=config.w_momentum,
                               weight_decay=0.)
@@ -137,8 +141,10 @@ def train(train_loader, valid_loader, model, architect, w_optim, lr, epoch): #al
     model.train()
 
     for step, ((trn_X, trn_y), (val_X, val_y)) in enumerate(zip(train_loader, valid_loader)):
-        trn_X, trn_y = trn_X.to(device, non_blocking=True), trn_y.to(device, non_blocking=True)
-        val_X, val_y = val_X.to(device, non_blocking=True), val_y.to(device, non_blocking=True)
+        trn_X, trn_y = trn_X.cuda(), trn_y.cuda()
+        val_X, val_y = val_X.cuda(), val_y.cuda()
+        #trn_X, trn_y = trn_X.to(device, non_blocking=True), trn_y.to(device, non_blocking=True)
+        #val_X, val_y = val_X.to(device, non_blocking=True), val_y.to(device, non_blocking=True)
         N = trn_X.size(0)
 
         # phase 2. architect step (alpha)
@@ -173,7 +179,7 @@ def train(train_loader, valid_loader, model, architect, w_optim, lr, epoch): #al
         cur_step += 1
         if cur_step == 3:
             break
-    model._save_features(config.path, epoch)
+    model.net._save_features(config.path, epoch)
 
     logger.info("Train: [{:2d}/{}] Final Prec@1 {:.4%}".format(epoch+1, config.epochs, top1.avg))
 
@@ -187,7 +193,8 @@ def validate(valid_loader, model, epoch, cur_step):
 
     with torch.no_grad():
         for step, (X, y) in enumerate(valid_loader):
-            X, y = X.to(device, non_blocking=True), y.to(device, non_blocking=True)
+            X, y = X.cuda(), y.cuda()
+            #X, y = X.to(device, non_blocking=True), y.to(device, non_blocking=True)
             N = X.size(0)
 
             logits = model(X)

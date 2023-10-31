@@ -105,8 +105,14 @@ class Architect(object):
     
     def mlc_loss(self, arch_param):
         y_pred_neg = arch_param
-        neg_loss = torch.logsumexp(y_pred_neg, -1)
-        aux_loss = torch.mean(neg_loss)
+        norm_loss = 0
+        red_loss = 0
+        for i in range(self.model.n_nodes):
+            norm_loss += torch.mean(torch.logsumexp(y_pred_neg[0][i], dim=-1))
+            red_loss += torch.mean(torch.logsumexp(y_pred_neg[1][i], dim=-1))
+        norm_loss /= self.model.n_nodes
+        red_loss /= self.model.n_nodes
+        aux_loss = (norm_loss + red_loss) / 2
         return aux_loss
 
     def cluster_loss(self):
@@ -123,7 +129,7 @@ class Architect(object):
         
         # Calculate mean of std values for loss
         iteration = 0
-        mixed_cell_feature = self.model.mixed_cell_feature()
+        mixed_cell_feature = self.model.net.mixed_cell_feature()
         for cell in range(self.model.n_layers):
             for node in range(self.model.n_nodes):
                 for edge in range(2+node):
@@ -154,21 +160,18 @@ class Architect(object):
         self.loss = loss
         
         weights = 0 + 50*epoch/100
-        ssr_normal = self.mlc_loss(self.model.arch_parameters)
-        
+        ssr_normal = self.mlc_loss(self.model._alphas)
+        return loss + weights*ssr_normal
         cluster_loss = self.cluster_loss()
-        print('loss', loss)
-        print('ssr_normal', ssr_normal)
-        print('weights*ssr_normal', weights*ssr_normal)
-        print('cluster_loss', cluster_loss)
         if self.anchor == 'True':
-            lmd = 1
-            new_loss = loss + cluster_loss# + weights*ssr_normal
+            lmd1 = 1/2
+            lmd2 = 1/2
+            new_loss = lmd1 * loss + lmd2 * cluster_loss + weights*ssr_normal
             
         else:
-            lmd = 1
-            new_loss = loss + cluster_loss# + weights*ssr_normal
+            lmd1 = 1/2
+            lmd2 = 1/2
+            new_loss = lmd1 * loss + lmd2 * cluster_loss + weights*ssr_normal
         
         self.final_loss = new_loss
-        print('new_loss', new_loss)
         return new_loss

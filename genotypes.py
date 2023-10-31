@@ -99,7 +99,6 @@ def parse(alpha, k):
     ]
     each node has two edges (k=2) in CNN.
     """
-
     gene = []
     assert PRIMITIVES[-1] == 'none' # assume last PRIMITIVE is 'none'
 
@@ -118,6 +117,7 @@ def parse(alpha, k):
         gene.append(node_gene)
 
     return gene
+    
 """
 def save_alphas(alphas, primitives, save_dir, epoch=None, is_best=False):
     if epoch is not None:
