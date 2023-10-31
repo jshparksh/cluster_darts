@@ -30,7 +30,7 @@ def main():
     logger.info("Logger is set - training start")
 
     # set default gpu device id
-    #torch.cuda.set_device(config.gpus[0])
+    torch.cuda.set_device(config.gpus[0])
 
     # set seed
     np.random.seed(config.seed)
@@ -82,7 +82,7 @@ def main():
     
     lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         w_optim, config.epochs, eta_min=config.w_lr_min)
-        
+    
     architect = Architect(model, criterion, config)
     
     # training loop
@@ -134,6 +134,8 @@ def train(train_loader, valid_loader, model, architect, w_optim, lr, epoch): #al
     top1 = utils.AverageMeter()
     top5 = utils.AverageMeter()
     losses = utils.AverageMeter()
+    arc_losses = utils.AverageMeter()
+    cluster_losses = utils.AverageMeter()
 
     cur_step = epoch*len(train_loader)
     writer.add_scalar('train/lr', lr, cur_step)
@@ -149,7 +151,8 @@ def train(train_loader, valid_loader, model, architect, w_optim, lr, epoch): #al
 
         # phase 2. architect step (alpha)
         architect.step(trn_X, trn_y, val_X, val_y, lr, w_optim, epoch, unrolled=config.unrolled)
-
+        arc_loss = architect.arc_loss
+        cluster_loss = architect.cluster_loss
         # phase 1. child network step (w)
         w_optim.zero_grad()
         logits = model(trn_X)
@@ -165,20 +168,20 @@ def train(train_loader, valid_loader, model, architect, w_optim, lr, epoch): #al
         losses.update(loss.item(), N)
         top1.update(prec1.item(), N)
         top5.update(prec5.item(), N)
+        arc_losses.update(arc_loss.item(), N)
+        cluster_losses.update(cluster_loss.item(), N)
 
         if step % config.print_freq == 0 or step == len(train_loader)-1:
             logger.info(
-                "Train: [{:2d}/{}] Step {:03d}/{:03d} Loss {losses.avg:.3f}"
+                "Train: [{:2d}/{}] Step {:03d}/{:03d} Loss {losses.avg:.3f} Arc_Loss {arc_losses.avg:.3f} Cluster_Loss {cluster_losses.avg:.3f} "
                 "Prec@(1,5) ({top1.avg:.1%}, {top5.avg:.1%})".format(
-                    epoch + 1, config.epochs, step, len(train_loader) - 1, losses=losses, 
+                    epoch + 1, config.epochs, step, len(train_loader) - 1, losses=losses, arc_losses=arc_losses, cluster_losses=cluster_losses, 
                     top1=top1, top5=top5))
 
         writer.add_scalar('train/loss', loss.item(), cur_step)
         writer.add_scalar('train/top1', prec1.item(), cur_step)
         writer.add_scalar('train/top5', prec5.item(), cur_step)
         cur_step += 1
-        if cur_step == 3:
-            break
     model.net._save_features(config.path, epoch)
 
     logger.info("Train: [{:2d}/{}] Final Prec@1 {:.4%}".format(epoch+1, config.epochs, top1.avg))

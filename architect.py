@@ -18,8 +18,8 @@ class Architect(object):
         self.network_weight_decay = config.w_weight_decay
         self.model = model
         self.criterion = criterion
-        self.max_lmd = torch.nn.Parameter(torch.tensor(0.0, dtype= torch.float32, requires_grad=False)).cuda()
-        self.min_lmd = torch.nn.Parameter(torch.tensor(10000, dtype= torch.float32, requires_grad=False)).cuda()
+        self.max_lmd = 0 #torch.nn.Parameter(torch.tensor(0.0, dtype= torch.float32, requires_grad=False))
+        self.min_lmd = 100000 #torch.nn.Parameter(torch.tensor(10000, dtype= torch.float32, requires_grad=False))
         self.anchor = config.anchor
         self.optimizer = torch.optim.Adam(self.model.arch_parameters(),
                                           lr=config.alpha_lr, betas=(0.5, 0.999),
@@ -103,7 +103,7 @@ class Architect(object):
 
         return [(x - y).div_(2 * R) for x, y in zip(grads_p, grads_n)]
     
-    def mlc_loss(self, arch_param):
+    def _mlc_loss(self, arch_param):
         y_pred_neg = arch_param
         norm_loss = 0
         red_loss = 0
@@ -115,7 +115,7 @@ class Architect(object):
         aux_loss = (norm_loss + red_loss) / 2
         return aux_loss
 
-    def cluster_loss(self):
+    def _cluster_loss(self):
         # get output data from MixedOP, flatten and mean value
         loss = 0
         op_groups = gt.PRIMITIVES_GROUPS
@@ -130,21 +130,23 @@ class Architect(object):
         # Calculate mean of std values for loss
         iteration = 0
         mixed_cell_feature = self.model.net.mixed_cell_feature()
+        
         for cell in range(self.model.n_layers):
             for node in range(self.model.n_nodes):
                 for edge in range(2+node):
                     feature = mixed_cell_feature[cell]["node{}_edge{}".format(node, edge)]
                     if self.anchor == 'True':
                         group_dist, anchor_dist = utils.compute_group_std(feature, indices, self.anchor)
+                        group_dist, anchor_dist = group_dist.to(torch.device('cuda:0')), anchor_dist.to(torch.device('cuda:0'))
                         if group_dist > self.max_lmd:
                             self.max_lmd = group_dist
                         if anchor_dist < self.min_lmd:
                             self.min_lmd = anchor_dist
-                        
                         loss += group_dist/self.max_lmd.detach()+ self.min_lmd.detach()/anchor_dist
                         iteration += 1
                     else:
                         std, gstd = utils.compute_group_std(feature, indices, self.anchor)
+                        std, gstd = std.to(torch.device('cuda:0')), gstd.to(torch.device('cuda:0'))
                         if std > self.max_lmd:
                             self.max_lmd = std
                         if gstd < self.min_lmd:
@@ -157,12 +159,14 @@ class Architect(object):
     
     def _compute_loss(self, input_valid, target_valid, epoch):
         loss = self.criterion(input_valid, target_valid)
-        self.loss = loss
-        
         weights = 0 + 50*epoch/100
-        ssr_normal = self.mlc_loss(self.model._alphas)
-        return loss + weights*ssr_normal
-        cluster_loss = self.cluster_loss()
+        ssr_normal = self._mlc_loss(self.model._alphas)
+        cluster_loss = self._cluster_loss()
+        
+        self.loss = loss
+        self.normal_term = weights*ssr_normal
+        self.cluster_loss = cluster_loss
+        
         if self.anchor == 'True':
             lmd1 = 1/2
             lmd2 = 1/2
@@ -172,6 +176,6 @@ class Architect(object):
             lmd1 = 1/2
             lmd2 = 1/2
             new_loss = lmd1 * loss + lmd2 * cluster_loss + weights*ssr_normal
-        
-        self.final_loss = new_loss
+            
+        self.arc_loss = new_loss
         return new_loss
