@@ -60,11 +60,11 @@ def compute_online(data_loader, model, feature_dir):
 
     cnt_samples = 0
     for step, (images, labels) in enumerate(data_loader):
-        images = images.to(device, non_blocking=True)
-        labels = labels.to(device, non_blocking=True)
+        images = images.cuda() #images.to(device, non_blocking=True)
+        labels = labels.cuda() #labels.to(device, non_blocking=True)
         num_samples = images.size(0)
 
-        _ = model(images, drop_rate=config.drop_rate) #save=True, feature_dir=feature_dir, mode="wb")
+        _ = model(images) #save=True, feature_dir=feature_dir, mode="wb")
 
         for key in mean_list.keys():
             feature_file = os.path.join(feature_dir, "{}.pk".format(key))
@@ -80,7 +80,8 @@ def compute_online(data_loader, model, feature_dir):
                     mean_list=mean_list[key],
                     covariance_list=covariance_list[key])
         cnt_samples += num_samples
-        
+        if cnt_samples == 5:
+            break
     for key in mean_list.keys():
         covariance = np.zeros((num_features, num_features), np.float32)
         for i in range(num_features):
@@ -97,6 +98,7 @@ def compute_online(data_loader, model, feature_dir):
                 save_dir, "dist_{}_group{}.png".format(key, k))
             fmp.plot_clusters(mean_list[key], k, dist_file, annotate=op_names)
 
+    
     logger.info("num_samples: {}".format(cnt_samples))
 
 
@@ -119,35 +121,32 @@ def main():
 
     # get data with meta info
     logger.info("preparing data...")
-    input_size, channels_in, num_classes, train_data, valid_data = \
-        get_data(dataset=config.dataset,
-                     data_path=config.data_dir,
-                     cutout_length=0,
-                     validation=True)
-
+    
+    input_size, input_channels, n_classes, train_data = utils.get_data(
+        config.dataset, config.data_path, cutout_length=0, validation=False)
+    
+    n_train = len(train_data)
+    split = n_train // 2
+    indices = list(range(n_train))
+    
     train_loader = torch.utils.data.DataLoader(
-        dataset=train_data,
-        batch_size=config.batch_size,
-        sampler=torch.utils.data.sampler.SubsetRandomSampler(
-            list(range(config.total_samples))),
-        num_workers=config.workers,
-        pin_memory=True)
+        train_data, batch_size=config.batch_size,
+        sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[:split]),
+        pin_memory=True, num_workers=4)
 
     valid_loader = torch.utils.data.DataLoader(
-        dataset=valid_data,
-        batch_size=config.batch_size,
-        sampler=torch.utils.data.sampler.SubsetRandomSampler(
-            list(range(config.total_samples))),
-        num_workers=config.workers,
-        pin_memory=True)
-
+        train_data, batch_size=config.batch_size,
+        sampler=torch.utils.data.sampler.SubsetRandomSampler(indices[split:n_train]),
+        pin_memory=True, num_workers=4)
+    
+    
     logger.info("loading model...")
-    net_crit = nn.CrossEntropyLoss().to(device)
+    net_crit = nn.CrossEntropyLoss().cuda() #to(device)
     CLASSES = 10
-    model = SearchCNNController(config.init_channels, CLASSES,
-                                config.layers, net_crit, device_ids=config.gpus)
+    model = SearchCNNController(input_size, input_channels, config.init_channels, n_classes, config.layers,
+                                net_crit, device_ids=config.gpus)
     model = utils.load_checkpoint(model, config.path)
-    model = model.to(device)
+    model = model.cuda() #to(device)
     model.eval()
 
     config.num_cells = len(model.net.cells)
