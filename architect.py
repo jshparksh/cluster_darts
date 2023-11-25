@@ -16,6 +16,7 @@ class Architect(object):
     def __init__(self, model, criterion, config):
         self.network_momentum = config.w_momentum
         self.network_weight_decay = config.w_weight_decay
+        self.first_gpu = 'cuda:'+str(config.gpus[0])
         self.model = model
         self.criterion = criterion
         self.max_lmd = 0 #torch.nn.Parameter(torch.tensor(0.0, dtype= torch.float32, requires_grad=False))
@@ -137,7 +138,7 @@ class Architect(object):
                     feature = mixed_cell_feature[cell]["node{}_edge{}".format(node, edge)]
                     if self.anchor == 'True':
                         group_dist, anchor_dist = utils.compute_group_std(feature, indices, self.anchor)
-                        group_dist, anchor_dist = group_dist.to(torch.device('cuda:0')), anchor_dist.to(torch.device('cuda:0'))
+                        group_dist, anchor_dist = group_dist.to(torch.device(self.first_gpu)), anchor_dist.to(torch.device(self.first_gpu))
                         if group_dist > self.max_lmd:
                             self.max_lmd = group_dist
                         if anchor_dist < self.min_lmd:
@@ -146,7 +147,7 @@ class Architect(object):
                         iteration += 1
                     else:
                         std, gstd = utils.compute_group_std(feature, indices, self.anchor)
-                        std, gstd = std.to(torch.device('cuda:0')), gstd.to(torch.device('cuda:0'))
+                        std, gstd = std.to(torch.device(self.first_gpu)), gstd.to(torch.device(self.first_gpu))
                         if std > self.max_lmd:
                             self.max_lmd = std
                         if gstd < self.min_lmd:
