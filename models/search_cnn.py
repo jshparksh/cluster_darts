@@ -121,7 +121,7 @@ class SearchCNNController(nn.Module):
             device_ids = list(range(torch.cuda.device_count()))
         self.device_ids = device_ids
 
-        # initialize architect parameters: alphas
+        """# initialize architect parameters: alphas
         n_ops = len(gt.PRIMITIVES)
 
         self.alpha_normal = nn.ParameterList()
@@ -135,7 +135,7 @@ class SearchCNNController(nn.Module):
         self._alphas = []
         for n, p in self.named_parameters():
             if 'alpha' in n:
-                self._alphas.append((n, p))
+                self._alphas.append((n, p))"""
 
         self.net = SearchCNN(C_in, C, n_classes, n_layers, n_nodes, multiplier, stem_multiplier)
         
@@ -204,7 +204,7 @@ class SearchCNNController(nn.Module):
         self.alpha_normal = nn.Parameter(1e-3*torch.randn(k, n_ops).cuda())
         self.alpha_reduce = nn.Parameter(1e-3*torch.randn(k, n_ops).cuda())
         """
-        n_ops = len(gt.PRIMITIVES)
+        n_ops = len(gt.PRIMITIVES_FIRST)
 
         self.alpha_normal = nn.ParameterList()
         self.alpha_reduce = nn.ParameterList()
@@ -219,6 +219,27 @@ class SearchCNNController(nn.Module):
             if 'alpha' in n:
                 self._arch_parameters.append((n, p))
     
+    def _transfer_alphas(self):
+        self.new_alpha_normal = nn.ParameterList()
+        self.new_alpha_reduce = nn.ParameterList()
+        
+        n_ops = len(gt.PRIMITIVES_SECOND)
+        
+        for i in range(self.n_nodes):
+            self.new_alpha_normal.append(nn.Parameter(torch.zeros(i+2, n_ops)))
+            self.new_alpha_reduce.append(nn.Parameter(torch.zeros(i+2, n_ops)))
+        
+        for first_idx in range(len(gt.PRIMITIVES_FIRST)):
+            layer_type = gt.PRIMITIVES_FIRST[first_idx].split('_')[0]
+            for second_idx in range(len(gt.PRIMITIVES_SECOND)):
+                if layer_type == gt.PRIMITIVES_SECOND[second_idx].split('_')[0]:
+                    for i in range(self.n_nodes):
+                        for j in range(i+2):
+                            self.new_alpha_normal[i][j][second_idx].data = self.alpha_normal[i][j][first_idx]
+                            self.new_alpha_reduce[i][j][second_idx].data = self.alpha_reduce[i][j][first_idx]
+    
+    def _transfer_weights(self):
+        pass
     def arch_parameters(self):
         for n, p in self._arch_parameters:
             yield p

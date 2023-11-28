@@ -73,6 +73,7 @@ class SearchConfig(BaseConfig):
 
         self.data_path = os.path.join('/dataset/', self.dataset)
         self.path = os.path.join('searchs', self.name)
+        self.feature_path = os.path.join(self.path, 'features')
         self.plot_path = os.path.join(self.path, 'plots')
         self.gpus = parse_gpus(self.gpus)
 

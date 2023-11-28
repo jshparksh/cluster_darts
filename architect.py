@@ -38,16 +38,19 @@ class Architect(object):
         unrolled_model = self._construct_model_from_theta(theta.sub(eta, moment + dtheta))
         return unrolled_model
 
-    def step(self, input_train, target_train, input_valid, target_valid, eta, network_optimizer, epoch, unrolled):
+    def step(self, input_train, target_train, input_valid, target_valid, eta, network_optimizer, epoch, cluster, unrolled):
         self.optimizer.zero_grad()
         if unrolled:
             self._backward_step_unrolled(input_train, target_train, input_valid, target_valid, eta, network_optimizer)
         else:
-            self._backward_step(input_valid, target_valid, epoch)
+            self._backward_step(input_valid, target_valid, epoch, cluster)
         self.optimizer.step()
 
-    def _backward_step(self, input_valid, target_valid, epoch):
-        loss = self._compute_loss(self.model(input_valid), target_valid, epoch)
+    def _backward_step(self, input_valid, target_valid, epoch, cluster):
+        if cluster == True:
+            loss = self._compute_loss(self.model(input_valid), target_valid, epoch)
+        else:
+            loss = self.criterion(self.model(input_valid), target_valid)
         loss.backward() #retain_graph=True)
 
     def _backward_step_unrolled(self, input_train, target_train, input_valid, target_valid, eta, network_optimizer):
@@ -162,21 +165,21 @@ class Architect(object):
         loss = self.criterion(input_valid, target_valid)
         weights = 0 + 50*epoch/100
         ssr_normal = self._mlc_loss(self.model._alphas)
-        cluster_loss = self._cluster_loss()
+        cl_loss = self._cluster_loss()
         
         self.loss = loss
         self.normal_term = weights*ssr_normal
-        self.cluster_loss = cluster_loss
+        self.cl_loss = cl_loss
         
         if self.anchor == 'True':
             lmd1 = 1/2
             lmd2 = 1/2
-            new_loss = lmd1 * loss + lmd2 * cluster_loss + weights*ssr_normal
+            new_loss = lmd1 * loss + lmd2 * cl_loss + weights*ssr_normal
             
         else:
             lmd1 = 1/2
             lmd2 = 1/2
-            new_loss = lmd1 * loss + lmd2 * cluster_loss + weights*ssr_normal
+            new_loss = lmd1 * loss + lmd2 * cl_loss + weights*ssr_normal
             
         self.arc_loss = new_loss
         return new_loss

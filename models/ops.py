@@ -9,9 +9,15 @@ from PACT import *
 
 OPS = {
     'none': lambda C, stride, affine: Zero(stride),
-    #'avg_pool_3x3': lambda C, stride, affine: PoolBN('avg', C, 3, stride, 1, affine=affine),
+    'avg_pool_3x3': lambda C, stride, affine: PoolBN('avg', C, 3, stride, 1, affine=affine),
     'max_pool_3x3': lambda C, stride, affine: PoolBN('max', C, 3, stride, 1, affine=affine),
     'skip_connect': lambda C, stride, affine: Identity() if stride == 1 else FactorizedReduce(C, C, affine=affine),
+    'conv_3x3_16' : lambda C, stride, affine: ConvQ(C, C, kernel_size=3, stride=stride, padding=1, 
+                        num_bits=16, num_bits_weight=16, num_bits_grad=16, affine=affine),
+    'conv_3x3_8' : lambda C, stride, affine: ConvQ(C, C, kernel_size=3, stride=stride, padding=1, 
+                        num_bits=8, num_bits_weight=8, num_bits_grad=8, affine=affine),
+    'conv_3x3_4' : lambda C, stride, affine: ConvQ(C, C, kernel_size=3, stride=stride, padding=1, 
+                        num_bits=4, num_bits_weight=4, num_bits_grad=4, affine=affine),
     'sep_conv_3x3_16' : lambda C, stride, affine: SepConvQ(C, C, kernel_size=3, stride=stride, padding=1, 
                         num_bits=16, num_bits_weight=16, num_bits_grad=16, affine=affine),
     'sep_conv_3x3_8' : lambda C, stride, affine: SepConvQ(C, C, kernel_size=3, stride=stride, padding=1, 
@@ -120,7 +126,30 @@ class FacConv(nn.Module):
     def forward(self, x):
         return self.net(x)
 
+class Conv(nn.Module):
+    def __init__(self, C_in, C_out, kernel_size, stride, padding, affine=True):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.ReLU(),
+            nn.Conv2d(C_in, C_out, kernel_size, stride, padding, bias=False),
+            nn.BatchNorm2d(C_out, affine=affine)
+        )
 
+    def forward(self, x):
+        return self.net(x)
+    
+class ConvQ(nn.Module):
+    def __init__(self, C_in, C_out, kernel_size, stride, padding, num_bits, num_bits_weight, num_bits_grad, affine=True):
+        self.net = nn.Sequential(
+            PACT_with_quantize(num_bits=num_bits_weight),#nn.ReLU(inplace=False),
+            DorConv2d(C_in, C_out, kernel_size=kernel_size, stride=stride, padding=padding, bias=False, 
+                        num_bits=num_bits, num_bits_weight= num_bits_weight, num_bits_grad = num_bits_grad),
+            nn.BatchNorm2d(C_out, affine=affine)
+        )
+    
+    def forward(self, x):
+        return self.net(x)
+    
 class DilConv(nn.Module):
     """ (Dilated) depthwise separable conv
     ReLU - (Dilated) depthwise separable - Pointwise - BN

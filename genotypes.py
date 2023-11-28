@@ -13,6 +13,9 @@ from collections import namedtuple
 Genotype = namedtuple('Genotype', 'normal normal_concat reduce reduce_concat')
 
 PRIMITIVES = [
+    'conv_3x3_16',
+    'conv_3x3_8',
+    'conv_3x3_4',
     'sep_conv_3x3_16',
     'sep_conv_3x3_8',
     'sep_conv_3x3_4',
@@ -20,10 +23,36 @@ PRIMITIVES = [
     'dil_conv_3x3_8',
     'dil_conv_3x3_4',
     'max_pool_3x3',
+    'avg_pool_3x3', 
     'skip_connect',
-    'none',
-] #'avg_pool_3x3',  # deleted in `1-skip` search space, replaced by `skip-connect` in `3-skip` search space
+    'none'
+]
+PRIMITIVES_FIRST = [
+    'conv_3x3_16',
+    'sep_conv_3x3_16',
+    'dil_conv_3x3_16',
+    'max_pool_3x3',
+    'avg_pool_3x3',
+    'skip_connect',
+    'none'
+]
+PRIMITIVES_SECOND = [
+    'conv_3x3_16',
+    'conv_3x3_8',
+    'conv_3x3_4',
+    'sep_conv_3x3_16',
+    'sep_conv_3x3_8',
+    'sep_conv_3x3_4',
+    'dil_conv_3x3_16',
+    'dil_conv_3x3_8',
+    'dil_conv_3x3_4',
+    'none'
+]
 PRIMITIVES_GROUPS = [
+    [
+    'conv_3x3_16',
+    'conv_3x3_8',
+    'conv_3x3_4'],
     [
     'sep_conv_3x3_16',
     'sep_conv_3x3_8',
@@ -34,7 +63,7 @@ PRIMITIVES_GROUPS = [
     'dil_conv_3x3_4'],
     [
     'max_pool_3x3',
-    #'avg_pool_3x3',  # deleted in `1-skip` search space, replaced by `skip-connect` in `3-skip` search space
+    'avg_pool_3x3',
     'skip_connect']
     #['none']
 ]
@@ -106,7 +135,7 @@ def parse(alpha, k):
     # 2) Choose top-k edges per node by edge score (top-1 weight in edge)
     for edges in alpha:
         # edges: Tensor(n_edges, n_ops)
-        edge_max, primitive_indices = torch.topk(edges[:, :-1], 1) # ignore 'none'
+        edge_max, primitive_indices = torch.topk(edges[:, :-1], 1) # ignore 'none' 
         topk_edge_values, topk_edge_indices = torch.topk(edge_max.view(-1), k)
         node_gene = []
         for edge_idx in topk_edge_indices:
