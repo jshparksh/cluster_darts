@@ -237,9 +237,10 @@ class SearchCNNController(nn.Module):
                         for j in range(i+2):
                             self.new_alpha_normal[i][j][second_idx].data = self.alpha_normal[i][j][first_idx]
                             self.new_alpha_reduce[i][j][second_idx].data = self.alpha_reduce[i][j][first_idx]
+                            
+        self.alpha_normal = self.new_alpha_normal
+        self.alpha_reduce = self.new_alpha_reduce
     
-    def _transfer_weights(self):
-        pass
     def arch_parameters(self):
         for n, p in self._arch_parameters:
             yield p

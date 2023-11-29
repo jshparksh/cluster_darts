@@ -63,6 +63,7 @@ class SearchConfig(BaseConfig):
         parser.add_argument('--feature_epoch', type=str, default='0', help='saved feature at specific epoch')
         parser.add_argument('--anchor', type=str, default='True', help='anchor for cluster loss')
         parser.add_argument('--unrolled', action='store_true', default=False, help='use one-step unrolled validation loss')
+        parser.add_argument('--cluster', type=bool, default=False, help='use cluster loss')
 
         return parser
 
