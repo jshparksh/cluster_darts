@@ -181,6 +181,7 @@ class SearchCNNController(nn.Module):
         # restore formats
         for handler, formatter in zip(logger.handlers, org_formatters):
             handler.setFormatter(formatter)
+    
 
     def genotype(self):
         gene_normal = gt.parse(self.alpha_normal, k=2)
@@ -219,7 +220,7 @@ class SearchCNNController(nn.Module):
             if 'alpha' in n:
                 self._arch_parameters.append((n, p))
     
-    def _transfer_alphas(self):
+    def _transfer_alphas(self, node_idx, edge_idx, op_type):
         self.new_alpha_normal = nn.ParameterList()
         self.new_alpha_reduce = nn.ParameterList()
         
@@ -235,8 +236,13 @@ class SearchCNNController(nn.Module):
                 if layer_type == gt.PRIMITIVES_SECOND[second_idx].split('_')[0]:
                     for i in range(self.n_nodes):
                         for j in range(i+2):
+                            if i == node_idx and j == edge_idx:
+                                self.new_alpha_normal[i][j].data = torch.ones(1)
+                                self.new_alpha_reduce[i][j].data = torch.ones(1)
                             self.new_alpha_normal[i][j][second_idx].data = self.alpha_normal[i][j][first_idx]
                             self.new_alpha_reduce[i][j][second_idx].data = self.alpha_reduce[i][j][first_idx]
+    
+
                             
         self.alpha_normal = self.new_alpha_normal
         self.alpha_reduce = self.new_alpha_reduce
