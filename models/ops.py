@@ -268,8 +268,10 @@ class MixedOp(nn.Module):
         super().__init__()
         self._ops = nn.ModuleList()
         self._feature = []
+        self.C = C
+        self.stride = stride
         
-        for primitive in gt.PRIMITIVES:
+        for primitive in gt.PRIMITIVES_FIRST:
             op = OPS[primitive](C, stride, affine=False)
             self._ops.append(op)
 
@@ -286,4 +288,9 @@ class MixedOp(nn.Module):
     def feature(self):
         return self._feature
 
-
+    def swap_ops(self):
+        self._new_ops = nn.ModuleList()
+        for primitive in gt.PRIMITIVES_SECOND:
+            op = OPS[primitive](self.C, self.stride, affine=False)
+            self._new_ops.append(op)
+        self._ops = self._new_ops

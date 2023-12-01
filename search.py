@@ -94,8 +94,11 @@ def main():
 
         # training
         if epoch == config.switching_epoch:
-            print("Switching to cluster training")
+            print("Switching to training mode")
             config.cluster = True
+            # ops -> swap_ops
+            # get genotype, select top 2 skip, pooling layers and fix with search_cell -> swap_dag
+            
         train(train_loader, valid_loader, model, architect, w_optim, lr, epoch) #alpha_optim,
         """
         # validation

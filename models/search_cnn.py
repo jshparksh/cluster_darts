@@ -91,7 +91,6 @@ class SearchCNN(nn.Module):
         for i in range(len(self.cells)):
             self._mixed_cell_feature[i] = self.cells[i].mixed_op_feature()
         return self._mixed_cell_feature
-
     
     def _save_features(self, path, curr_epoch):
         mixed_cell_feature = self.mixed_cell_feature()
@@ -184,6 +183,7 @@ class SearchCNNController(nn.Module):
     
 
     def genotype(self):
+        #### fix me
         gene_normal = gt.parse(self.alpha_normal, k=2)
         gene_reduce = gt.parse(self.alpha_reduce, k=2)
         concat = range(2, 2+self.n_nodes) # concat all intermediate nodes
@@ -192,6 +192,7 @@ class SearchCNNController(nn.Module):
                            reduce=gene_reduce, reduce_concat=concat)
 
     def weights(self):
+        #### fix me, should copy weights into new operations
         return self.parameters()
 
     def named_weights(self):
@@ -220,30 +221,34 @@ class SearchCNNController(nn.Module):
             if 'alpha' in n:
                 self._arch_parameters.append((n, p))
     
-    def _transfer_alphas(self, node_idx, edge_idx, op_type):
+    def _transfer_alphas(self, fixed_idx):
+        # fixed_idx = [(node_idx, edge_idx), (node_idx, edge_idx)]
         self.new_alpha_normal = nn.ParameterList()
         self.new_alpha_reduce = nn.ParameterList()
         
         n_ops = len(gt.PRIMITIVES_SECOND)
         
+        # To except one edge of fixed node's alpha
         for i in range(self.n_nodes):
-            self.new_alpha_normal.append(nn.Parameter(torch.zeros(i+2, n_ops)))
-            self.new_alpha_reduce.append(nn.Parameter(torch.zeros(i+2, n_ops)))
-        
-        for first_idx in range(len(gt.PRIMITIVES_FIRST)):
-            layer_type = gt.PRIMITIVES_FIRST[first_idx].split('_')[0]
-            for second_idx in range(len(gt.PRIMITIVES_SECOND)):
-                if layer_type == gt.PRIMITIVES_SECOND[second_idx].split('_')[0]:
-                    for i in range(self.n_nodes):
-                        for j in range(i+2):
-                            if i == node_idx and j == edge_idx:
-                                self.new_alpha_normal[i][j].data = torch.ones(1)
-                                self.new_alpha_reduce[i][j].data = torch.ones(1)
-                            self.new_alpha_normal[i][j][second_idx].data = self.alpha_normal[i][j][first_idx]
-                            self.new_alpha_reduce[i][j][second_idx].data = self.alpha_reduce[i][j][first_idx]
+            if i == fixed_idx[0] or i == fixed_idx[1]: # will not fix two edges in same node
+                self.new_alpha_normal.append(nn.Parameter(torch.zeros(i+1, n_ops)))
+                self.new_alpha_reduce.append(nn.Parameter(torch.zeros(i+1, n_ops)))
+            else:
+                self.new_alpha_normal.append(nn.Parameter(torch.zeros(i+2, n_ops)))
+                self.new_alpha_reduce.append(nn.Parameter(torch.zeros(i+2, n_ops)))
+                
+        for i in range(self.n_nodes):
+            for j in range(i+2):
+                if i == fixed_idx[0] or i == fixed_idx[1]:
+                    if j == i+1:
+                        break
+                for first_idx in range(len(gt.PRIMITIVES_FIRST)):
+                    layer_type = gt.PRIMITIVES_FIRST[first_idx].split('_')[0]
+                    for second_idx in range(len(gt.PRIMITIVES_SECOND)):
+                        if layer_type == gt.PRIMITIVES_SECOND[second_idx].split('_')[0]:
+                            self.new_alpha_normal[i][j][second_idx].data += self.alpha_normal[i][j][first_idx]
+                            self.new_alpha_reduce[i][j][second_idx].data += self.alpha_reduce[i][j][first_idx]
     
-
-                            
         self.alpha_normal = self.new_alpha_normal
         self.alpha_reduce = self.new_alpha_reduce
     

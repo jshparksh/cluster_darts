@@ -135,10 +135,7 @@ def parse(alpha, k):
     # 2) Choose top-k edges per node by edge score (top-1 weight in edge)
     for edges in alpha:
         # edges: Tensor(n_edges, n_ops)
-        # to do: how to get edge's type (mixedOp or not)?
-        # if I get type -> fix the non-mixedOp edge into that edge
-        # change k value for that node 
-        edge_max, primitive_indices = torch.topk(edges[:, :-1], 1) # ignore 'none' 
+        edge_max, primitive_indices = torch.topk(edges[:, :-1], 1) # ignore 'none'
         topk_edge_values, topk_edge_indices = torch.topk(edge_max.view(-1), k)
         node_gene = []
         for edge_idx in topk_edge_indices:
@@ -149,7 +146,55 @@ def parse(alpha, k):
         gene.append(node_gene)
 
     return gene
+
+def parse_fixed(alpha, k, fixed_info):
+    # edges: Tensor(n_edges, n_ops)
+    # fixed_info: [(fixed_node_idx, fixed_edge_idx, fixed_op_type (should be same with PRIMITIVE)), ...]
+    # to do: how to get edge's type (mixedOp or not)?
+    # if I get type -> fix the non-mixedOp edge into that edge
+    # change k value for that node 
+    gene = []
+    assert PRIMITIVES[-1] == 'none' # assume last PRIMITIVE is 'none'
+    node_idx = 0
     
+    for edges in alpha:
+        if node_idx == fixed_info[0][0]:
+            edge_max, primitive_indices = torch.topk(edges[:, :-1], 1) # ignore 'none' 
+            topk_edge_values, topk_edge_indices = torch.topk(edge_max.view(-1), k-1)
+            node_gene = []
+            node_gene.append((fixed_info[0][2], fixed_info[0][1]))
+            for edge_idx in topk_edge_indices:
+                prim_idx = primitive_indices[edge_idx]
+                prim = PRIMITIVES[prim_idx]
+                if edge_idx.item >= fixed_info[0][1]:
+                    node_gene.append((prim, edge_idx.item()+1))
+                else:
+                    node_gene.append((prim, edge_idx.item()))
+        elif node_idx == fixed_info[1][0]:
+            edge_max, primitive_indices = torch.topk(edges[:, :-1], 1) # ignore 'none' 
+            topk_edge_values, topk_edge_indices = torch.topk(edge_max.view(-1), k-1)
+            node_gene = []
+            node_gene.append((fixed_info[1][2], fixed_info[1][1]))
+            for edge_idx in topk_edge_indices:
+                prim_idx = primitive_indices[edge_idx]
+                prim = PRIMITIVES[prim_idx]
+                if edge_idx.item >= fixed_info[1][1]:
+                    node_gene.append((prim, edge_idx.item()+1))
+                else:
+                    node_gene.append((prim, edge_idx.item()))
+        else:
+            edge_max, primitive_indices = torch.topk(edges[:, :-1], 1) # ignore 'none' 
+            topk_edge_values, topk_edge_indices = torch.topk(edge_max.view(-1), k)
+            node_gene = []
+            for edge_idx in topk_edge_indices:
+                prim_idx = primitive_indices[edge_idx]
+                prim = PRIMITIVES[prim_idx]
+                node_gene.append((prim, edge_idx.item()))
+
+        gene.append(node_gene)
+        node_idx += 1
+
+    return gene
 """
 def save_alphas(alphas, primitives, save_dir, epoch=None, is_best=False):
     if epoch is not None:

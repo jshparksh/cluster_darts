@@ -64,6 +64,7 @@ class SearchConfig(BaseConfig):
         parser.add_argument('--anchor', type=str, default='True', help='anchor for cluster loss')
         parser.add_argument('--unrolled', action='store_true', default=False, help='use one-step unrolled validation loss')
         parser.add_argument('--cluster', type=bool, default=False, help='use cluster loss')
+        parser.add_argument('--switching_epoch', type=int, default=20, help='switching epoch for alpha transfer and search space switch')
 
         return parser
 

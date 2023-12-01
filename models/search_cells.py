@@ -23,6 +23,7 @@ class SearchCell(nn.Module):
         self.n_nodes = n_nodes
         self.multiplier = multiplier
         self._mixed_op_feature = {}
+        self.C = C
 
         # If previous cell is reduction cell, current input size does not match with
         # output size of cell[k-2]. So the output[k-2] should be reduced by preprocessing.
@@ -69,3 +70,19 @@ class SearchCell(nn.Module):
 
     def mixed_op_feature(self):
         return self._mixed_op_feature
+
+    def swap_dag(self, fix_info):
+        # fix_info = [(node_idx, edge_idx, op_type), ...] len(fix_idx) = 2
+        # should call swap_ops() at ops.py first to swap MixedOp
+        self.new_dag = nn.ModuleList()
+        for i in range(self.n_nodes):
+            self.new_dag.append(nn.ModuleList())
+            for j in range(2+i):
+                stride = 2 if self.reduction and j < 2 else 1
+                if i == fix_info[0][0] and j == fix_info[0][1]:
+                    op = ops.OPS[fix_info[0][2]](self.C, stride, affine=False)
+                elif i == fix_info[1][0] and j == fix_info[1][1]:
+                    op = ops.OPS[fix_info[1][2]](self.C, stride, affine=False)
+                op = ops.MixedOp(self.C, stride)
+                self.new_dag[i].append(op)
+        self.dag = self.new_dag
