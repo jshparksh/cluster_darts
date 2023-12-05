@@ -109,7 +109,38 @@ def from_str(s):
 
     return genotype
 
+def fix_np(alpha, k):
+    # k: number of fixed np edges
+    np_info = []
+    
+    np_edge = []
+    node_idx = 0
 
+    for edges in alpha:
+        np_max, primitive_indices = torch.topk(edges[:,3:-1], 1) # 3 is the index of first np edge
+        topk_edge_values, topk_edge_indices = torch.topk(np_max.view(-1), k)
+        primitive_indices += 3
+        for i in range(len(topk_edge_values)):
+            edge_idx = topk_edge_indices[i]
+            prim_idx = primitive_indices[edge_idx]
+            prim = PRIMITIVES_FIRST[prim_idx]
+            if len(np_edge) != 2:
+                np_edge.append((node_idx, edge_idx.item(), prim, topk_edge_values[i].item()))
+            else:
+                for j in range(len(np_edge)):
+                    if np_edge[j][3] < topk_edge_values[i].item():
+                        if j == 0:
+                            np_edge[j+1] = np_edge[j]
+                        np_edge[j] = (node_idx, edge_idx.item(), prim, topk_edge_values[i].item())
+                        break
+        node_idx += 1
+    
+    for data in np_edge:
+        # to return w/o alpha values
+        np_info.append(data[:-1])
+        
+    return np_info
+    
 def parse(alpha, k):
     """
     parse continuous alpha to discrete gene.

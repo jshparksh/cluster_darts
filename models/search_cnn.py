@@ -183,7 +183,6 @@ class SearchCNNController(nn.Module):
     
 
     def genotype(self):
-        #### fix me
         gene_normal = gt.parse(self.alpha_normal, k=2)
         gene_reduce = gt.parse(self.alpha_reduce, k=2)
         concat = range(2, 2+self.n_nodes) # concat all intermediate nodes
@@ -191,8 +190,20 @@ class SearchCNNController(nn.Module):
         return gt.Genotype(normal=gene_normal, normal_concat=concat,
                            reduce=gene_reduce, reduce_concat=concat)
 
+    def fix_nonparam_layers(self):
+        # fix two top value np layer for each cell type
+        
+        pass
+    
+    def genotype_fixed(self, fixed_layer_info):
+        gene_normal = gt.parse_fixed(self.alpha_normal, k=2, fixed_info=fixed_layer_info)
+        gene_reduce = gt.parse_fixed(self.alpha_reduce, k=2, fixed_info=fixed_layer_info)
+        concat = range(2, 2+self.n_nodes) # concat all intermediate nodes
+
+        return gt.Genotype(normal=gene_normal, normal_concat=concat,
+                           reduce=gene_reduce, reduce_concat=concat)
+        
     def weights(self):
-        #### fix me, should copy weights into new operations
         return self.parameters()
 
     def named_weights(self):
@@ -222,7 +233,7 @@ class SearchCNNController(nn.Module):
                 self._arch_parameters.append((n, p))
     
     def _transfer_alphas(self, fixed_idx):
-        # fixed_idx = [(node_idx, edge_idx), (node_idx, edge_idx)]
+        # fixed_idx = [node_idx0, node_idx1]
         self.new_alpha_normal = nn.ParameterList()
         self.new_alpha_reduce = nn.ParameterList()
         

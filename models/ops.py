@@ -140,6 +140,7 @@ class Conv(nn.Module):
     
 class ConvQ(nn.Module):
     def __init__(self, C_in, C_out, kernel_size, stride, padding, num_bits, num_bits_weight, num_bits_grad, affine=True):
+        super(ConvQ, self).__init__()
         self.net = nn.Sequential(
             PACT_with_quantize(num_bits=num_bits_weight),#nn.ReLU(inplace=False),
             DorConv2d(C_in, C_out, kernel_size=kernel_size, stride=stride, padding=padding, bias=False, 
