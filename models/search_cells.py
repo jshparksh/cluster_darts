@@ -84,6 +84,6 @@ class SearchCell(nn.Module):
                     op = ops.OPS[fixed_info[0][2]](self.C, stride, affine=False)
                 elif i == fixed_info[1][0] and j == fixed_info[1][1]:
                     op = ops.OPS[fixed_info[1][2]](self.C, stride, affine=False)
-                op = ops.MixedOp(self.C, stride)
+                op = ops.MixedOp(self.C, stride).swap_ops()
                 self.new_dag[i].append(op)
         self.dag = self.new_dag

@@ -106,7 +106,6 @@ class SearchCNN(nn.Module):
     
     def _replace_cells(self, fixed_info_normal, fixed_info_reduce):
         # fixed_info = [(node_idx, edge_idx, op_type), ...]
-        ops.MixedOp().swap_ops()
         C_pp, C_p, C_cur = C_cur, C_cur, self.C
         self.new_cells = nn.ModuleList()
         reduction_p = False
