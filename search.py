@@ -90,7 +90,7 @@ def main():
         lr_scheduler.step()
         lr = lr_scheduler.get_lr()[0]
 
-        model.module.print_alphas(logger)
+        model.print_alphas(logger)
 
         # training
         if epoch == config.switching_epoch:

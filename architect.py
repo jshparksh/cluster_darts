@@ -22,7 +22,7 @@ class Architect(object):
         self.max_lmd = 0 #torch.nn.Parameter(torch.tensor(0.0, dtype= torch.float32, requires_grad=False))
         self.min_lmd = 100000 #torch.nn.Parameter(torch.tensor(10000, dtype= torch.float32, requires_grad=False))
         self.anchor = config.anchor
-        self.optimizer = torch.optim.Adam(self.model.module.arch_parameters(),
+        self.optimizer = torch.optim.Adam(self.model.arch_parameters(),
                                           lr=config.alpha_lr, betas=(0.5, 0.999),
                                           weight_decay=0.)
 
