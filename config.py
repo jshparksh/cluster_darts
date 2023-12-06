@@ -73,7 +73,7 @@ class SearchConfig(BaseConfig):
         args = parser.parse_args()
         super().__init__(**vars(args))
 
-        self.data_path = os.path.join('/dataset/', self.dataset)
+        self.data_path = os.path.join('/data/', self.dataset)
         self.path = os.path.join('searchs', self.name)
         self.feature_path = os.path.join(self.path, 'features')
         self.plot_path = os.path.join(self.path, 'plots')
