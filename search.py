@@ -97,6 +97,12 @@ def main():
             logger.info("Switching to cluster training mode")
             config.cluster = True
             model.transfer_mode()
+            
+            # new model and new optimizers
+            model = model.cuda()
+            w_optim = torch.optim.SGD(model.parameters(), config.w_lr, momentum=config.w_momentum,
+                              weight_decay=0.)
+            architect.new_arch_optimizer()
             # ops -> swap_ops
             # get genotype, select top 2 skip, pooling layers and fix with search_cell -> swap_dag
             

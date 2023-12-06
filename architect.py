@@ -45,6 +45,11 @@ class Architect(object):
         else:
             self._backward_step(input_valid, target_valid, epoch, cluster)
         self.optimizer.step()
+        
+    def new_arch_optimizer(self):
+        self.optimizer = torch.optim.Adam(self.model.arch_parameters(),
+                                          lr=0.0003, betas=(0.5, 0.999),
+                                          weight_decay=0.)
 
     def _backward_step(self, input_valid, target_valid, epoch, cluster):
         if cluster == True:

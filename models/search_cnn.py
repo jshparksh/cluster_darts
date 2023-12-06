@@ -275,12 +275,15 @@ class SearchCNNController(nn.Module):
         for i in range(self.n_nodes):
             if i == fixed_info_normal[0][0] or i == fixed_info_normal[1][0]: # will not fix two edges in same node
                 self.new_alpha_normal.append(nn.Parameter(torch.zeros(i+1, n_ops)))
+            else:
+                self.new_alpha_normal.append(nn.Parameter(torch.zeros(i+2, n_ops)))
+                
             if i == fixed_info_reduce[0][0] or i == fixed_info_reduce[1][0]:
                 self.new_alpha_reduce.append(nn.Parameter(torch.zeros(i+1, n_ops)))
             else:
-                self.new_alpha_normal.append(nn.Parameter(torch.zeros(i+2, n_ops)))
                 self.new_alpha_reduce.append(nn.Parameter(torch.zeros(i+2, n_ops)))
-        
+        self.new_alpha_normal = self.new_alpha_normal.cuda()
+        self.new_alpha_reduce = self.new_alpha_reduce.cuda()
         # new alpha normal
         for i in range(self.n_nodes):
             for j in range(i+2):
