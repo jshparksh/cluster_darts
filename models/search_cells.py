@@ -74,6 +74,7 @@ class SearchCell(nn.Module):
     def _swap_dag(self, fixed_info):
         # fix_info = [(node_idx, edge_idx, op_type), ...]
         # should call swap_ops() at ops.py first to swap MixedOp
+        
         self.new_dag = nn.ModuleList()
         for i in range(self.n_nodes):
             self.new_dag.append(nn.ModuleList())

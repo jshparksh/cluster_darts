@@ -94,8 +94,9 @@ def main():
 
         # training
         if epoch == config.switching_epoch:
-            print("Switching to training mode")
+            logger.info("Switching to cluster training mode")
             config.cluster = True
+            model.transfer_mode()
             # ops -> swap_ops
             # get genotype, select top 2 skip, pooling layers and fix with search_cell -> swap_dag
             
@@ -107,7 +108,10 @@ def main():
         """
         # log
         # genotype
-        genotype = model.genotype()
+        if epoch >= config.switching_epoch:
+            genotype = model.genotype_fixed()
+        else:
+            genotype = model.genotype()
         logger.info("genotype = {}".format(genotype))
         with open(os.path.join(config.path, 'genotype.txt'), 'w') as f:
             f.write(str(genotype))

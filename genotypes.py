@@ -60,12 +60,7 @@ PRIMITIVES_GROUPS = [
     [
     'dil_conv_3x3_16',
     'dil_conv_3x3_8',
-    'dil_conv_3x3_4'],
-    [
-    'max_pool_3x3',
-    'avg_pool_3x3',
-    'skip_connect']
-    #['none']
+    'dil_conv_3x3_4']
 ]
 
 
@@ -110,6 +105,7 @@ def from_str(s):
     return genotype
 
 def fix_np(alpha, k):
+    # fix two top value np layer and return info
     # k: number of fixed np edges
     np_info = []
     

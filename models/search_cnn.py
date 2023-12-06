@@ -7,6 +7,7 @@ import logging
 import utils
 import os
 
+from models import ops
 from torch.autograd import Variable
 from models.search_cells import SearchCell
 from torch.nn.parallel._functions import Broadcast
@@ -102,6 +103,33 @@ class SearchCNN(nn.Module):
                     feature = mixed_cell_feature[cell]["node{}_edge{}".format(node, edge)]
                     feature_str = "cell{}_node{}_edge{}.pk".format(cell, node, edge)
                     save_features(feature[:-1], os.path.join(dir_epoch, feature_str))
+    
+    def _replace_cells(self, fixed_info_normal, fixed_info_reduce):
+        # fixed_info = [(node_idx, edge_idx, op_type), ...]
+        ops.MixedOp().swap_ops()
+        C_pp, C_p, C_cur = C_cur, C_cur, self.C
+        self.new_cells = nn.ModuleList()
+        reduction_p = False
+        for i in range(self.n_layers):
+            # Reduce featuremap size and double channels in 1/3 and 2/3 layer.
+            if i in [self.n_layers//3, 2*self.n_layers//3]:
+                C_cur *= 2
+                reduction = True
+            else:
+                reduction = False
+            
+            cell = SearchCell(self.n_nodes, self.multiplier, C_pp, C_p, C_cur, reduction_p, reduction)
+            if reduction == True:
+                cell._swap_dag(fixed_info_reduce)
+            else:
+                cell._swap_dag(fixed_info_normal)
+            reduction_p = reduction
+            self.new_cells.append(cell)
+            C_cur_out = C_cur * self.n_nodes
+            C_pp, C_p = C_p, C_cur_out
+            
+        self.cells = self.new_cells
+
     """
     def loss(self, X, y):
         logits = self.forward(X)
@@ -190,14 +218,17 @@ class SearchCNNController(nn.Module):
         return gt.Genotype(normal=gene_normal, normal_concat=concat,
                            reduce=gene_reduce, reduce_concat=concat)
 
-    def fix_nonparam_layers(self):
-        # fix two top value np layer for each cell type
+    def fixed_layer_info(self):
+        # fixed two top value np layer for each cell type
+        fixed_normal = gt.fix_np(self.alpha_normal, k=2)
+        fixed_reduce = gt.fix_np(self.alpha_reduce, k=2)
         
-        pass
+        return fixed_normal, fixed_reduce
     
-    def genotype_fixed(self, fixed_layer_info):
-        gene_normal = gt.parse_fixed(self.alpha_normal, k=2, fixed_info=fixed_layer_info)
-        gene_reduce = gt.parse_fixed(self.alpha_reduce, k=2, fixed_info=fixed_layer_info)
+    def genotype_fixed(self, fixed_info_normal, fixed_info_reduce):
+        # fixed_info = [(node_idx, edge_idx, op_type), ...]
+        gene_normal = gt.parse_fixed(self.alpha_normal, k=2, fixed_info=fixed_info_normal)
+        gene_reduce = gt.parse_fixed(self.alpha_reduce, k=2, fixed_info=fixed_info_reduce)
         concat = range(2, 2+self.n_nodes) # concat all intermediate nodes
 
         return gt.Genotype(normal=gene_normal, normal_concat=concat,
@@ -232,25 +263,27 @@ class SearchCNNController(nn.Module):
             if 'alpha' in n:
                 self._arch_parameters.append((n, p))
     
-    def _transfer_alphas(self, fixed_idx):
-        # fixed_idx = [node_idx0, node_idx1]
+    def _transfer_alphas(self, fixed_info_normal, fixed_info_reduce):
+        # fixed_info = [(node_idx, edge_idx, op_type), ...]
         self.new_alpha_normal = nn.ParameterList()
         self.new_alpha_reduce = nn.ParameterList()
         
         n_ops = len(gt.PRIMITIVES_SECOND)
         
-        # To except one edge of fixed node's alpha
+        # to except one edge of fixed node's alpha
         for i in range(self.n_nodes):
-            if i == fixed_idx[0] or i == fixed_idx[1]: # will not fix two edges in same node
+            if i == fixed_info_normal[0][0] or i == fixed_info_normal[1][0]: # will not fix two edges in same node
                 self.new_alpha_normal.append(nn.Parameter(torch.zeros(i+1, n_ops)))
+            if i == fixed_info_reduce[0][0] or i == fixed_info_reduce[1][0]:
                 self.new_alpha_reduce.append(nn.Parameter(torch.zeros(i+1, n_ops)))
             else:
                 self.new_alpha_normal.append(nn.Parameter(torch.zeros(i+2, n_ops)))
                 self.new_alpha_reduce.append(nn.Parameter(torch.zeros(i+2, n_ops)))
-                
+        
+        # new alpha normal
         for i in range(self.n_nodes):
             for j in range(i+2):
-                if i == fixed_idx[0] or i == fixed_idx[1]:
+                if i == fixed_info_normal[0][0] or i == fixed_info_normal[1][0]:
                     if j == i+1:
                         break
                 for first_idx in range(len(gt.PRIMITIVES_FIRST)):
@@ -258,11 +291,28 @@ class SearchCNNController(nn.Module):
                     for second_idx in range(len(gt.PRIMITIVES_SECOND)):
                         if layer_type == gt.PRIMITIVES_SECOND[second_idx].split('_')[0]:
                             self.new_alpha_normal[i][j][second_idx].data += self.alpha_normal[i][j][first_idx]
+        
+        # new alpha reduce                              
+        for i in range(self.n_nodes):
+            for j in range(i+2):
+                if i == fixed_info_reduce[0][0] or i == fixed_info_reduce[1][0]:
+                    if j == i+1:
+                        break
+                for first_idx in range(len(gt.PRIMITIVES_FIRST)):
+                    layer_type = gt.PRIMITIVES_FIRST[first_idx].split('_')[0]
+                    for second_idx in range(len(gt.PRIMITIVES_SECOND)):
+                        if layer_type == gt.PRIMITIVES_SECOND[second_idx].split('_')[0]:
                             self.new_alpha_reduce[i][j][second_idx].data += self.alpha_reduce[i][j][first_idx]
-    
+
+        # replace old alpha with new alpha
         self.alpha_normal = self.new_alpha_normal
         self.alpha_reduce = self.new_alpha_reduce
     
+    def transfer_mode(self):
+        fixed_info_normal, fixed_info_reduce = self.fixed_layer_info()
+        self.net._replace_cells(fixed_info_normal, fixed_info_reduce)
+        self._transfer_alphas(fixed_info_normal, fixed_info_reduce)    
+
     def arch_parameters(self):
         for n, p in self._arch_parameters:
             yield p

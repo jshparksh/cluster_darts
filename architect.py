@@ -48,7 +48,7 @@ class Architect(object):
 
     def _backward_step(self, input_valid, target_valid, epoch, cluster):
         if cluster == True:
-            loss = self._compute_loss(self.model(input_valid), target_valid, epoch)
+            loss = self._compute_loss(self.model(input_valid), target_valid) #, epoch)
         else:
             loss = self.criterion(self.model(input_valid), target_valid)
         loss.backward() #retain_graph=True)
@@ -135,6 +135,7 @@ class Architect(object):
         iteration = 0
         mixed_cell_feature = self.model.net.mixed_cell_feature()
         
+        # max value for normalization
         for cell in range(self.model.n_layers):
             for node in range(self.model.n_nodes):
                 for edge in range(2+node):
@@ -161,25 +162,25 @@ class Architect(object):
         
         return loss
     
-    def _compute_loss(self, input_valid, target_valid, epoch):
+    def _compute_loss(self, input_valid, target_valid): #, epoch):
         loss = self.criterion(input_valid, target_valid)
-        weights = 0 + 50*epoch/100
-        ssr_normal = self._mlc_loss(self.model._alphas)
+        #weights = 0 + 50*epoch/100
+        #ssr_normal = self._mlc_loss(self.model._alphas)
         cl_loss = self._cluster_loss()
         
         self.loss = loss
-        self.normal_term = weights*ssr_normal
+        #self.normal_term = weights*ssr_normal
         self.cl_loss = cl_loss
         
         if self.anchor == 'True':
             lmd1 = 1/2
             lmd2 = 1/2
-            new_loss = lmd1 * loss + lmd2 * cl_loss + weights*ssr_normal
+            new_loss = lmd1 * loss + lmd2 * cl_loss #+ weights*ssr_normal
             
         else:
             lmd1 = 1/2
             lmd2 = 1/2
-            new_loss = lmd1 * loss + lmd2 * cl_loss + weights*ssr_normal
+            new_loss = lmd1 * loss + lmd2 * cl_loss #+ weights*ssr_normal
             
         self.arc_loss = new_loss
         return new_loss
