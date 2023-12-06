@@ -148,7 +148,8 @@ class SearchCNNController(nn.Module):
         if device_ids is None:
             device_ids = list(range(torch.cuda.device_count()))
         self.device_ids = device_ids
-
+        self.fixed_info_normal = None
+        self.fixed_info_reduce = None
         """# initialize architect parameters: alphas
         n_ops = len(gt.PRIMITIVES)
 
@@ -169,9 +170,13 @@ class SearchCNNController(nn.Module):
         
         self._initialize_alphas()
 
-    def forward(self, x):        
-        weights_normal = self.generate_weights(self.alpha_normal)
-        weights_reduce = self.generate_weights(self.alpha_reduce)
+    def forward(self, x, fixed=False):
+        if fixed==True:
+            weights_normal = self.generate_weights_fixed(self.alpha_normal, cell_type='normal')
+            weights_reduce = self.generate_weights_fixed(self.alpha_reduce, cell_type='reduce')
+        else:
+            weights_normal = self.generate_weights(self.alpha_normal)
+            weights_reduce = self.generate_weights(self.alpha_reduce)
 
         if len(self.device_ids) == 1:
             return self.net(x, weights_normal, weights_reduce)
@@ -223,6 +228,8 @@ class SearchCNNController(nn.Module):
         # fixed two top value np layer for each cell type
         fixed_normal = gt.fix_np(self.alpha_normal, k=2)
         fixed_reduce = gt.fix_np(self.alpha_reduce, k=2)
+        self.fixed_info_normal = fixed_normal
+        self.fixed_info_reduce = fixed_reduce
         
         return fixed_normal, fixed_reduce
     
@@ -335,9 +342,12 @@ class SearchCNNController(nn.Module):
             
         return weights
     
-    def generate_weights_fixed(self, alphas, fixed_info):
+    def generate_weights_fixed(self, alphas, cell_type):
         weights = []
-        
+        if cell_type == 'normal':
+            fixed_info = self.fixed_info_normal
+        elif cell_type == 'reduce':
+            fixed_info = self.fixed_info_reduce
         for i in range(len(alphas)): #i: node index
             alpha = alphas[i]                
             weight = torch.empty_like(alpha)

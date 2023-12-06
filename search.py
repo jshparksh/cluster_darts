@@ -166,7 +166,10 @@ def train(train_loader, valid_loader, model, architect, w_optim, lr, epoch): #al
         architect.step(trn_X, trn_y, val_X, val_y, lr, w_optim, epoch, cluster=config.cluster, unrolled=config.unrolled)
         # phase 1. child network step (w)
         w_optim.zero_grad()
-        logits = model(trn_X)
+        if config.cluster == True:
+            logits = model(trn_X, fixed=True)
+        else:
+            logits = model(trn_X)
         loss = model.criterion(logits, trn_y)
         
         loss.backward()
