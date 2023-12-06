@@ -39,6 +39,7 @@ class SearchCNN(nn.Module):
         self.n_layers = n_layers
         self.n_nodes = n_nodes
         self.multiplier = multiplier
+        self.stem_multiplier = stem_multiplier
         """
         if device_ids is None:
             device_ids = list(range(torch.cuda.device_count()))
@@ -106,6 +107,7 @@ class SearchCNN(nn.Module):
     
     def _replace_cells(self, fixed_info_normal, fixed_info_reduce):
         # fixed_info = [(node_idx, edge_idx, op_type), ...]
+        C_cur = self.stem_multiplier * self.C
         C_pp, C_p, C_cur = C_cur, C_cur, self.C
         self.new_cells = nn.ModuleList()
         reduction_p = False
