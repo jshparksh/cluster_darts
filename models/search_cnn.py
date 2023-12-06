@@ -334,3 +334,26 @@ class SearchCNNController(nn.Module):
             weights.append(weight)
             
         return weights
+    
+    def generate_weights_fixed(self, alphas, fixed_info):
+        weights = []
+        
+        for i in range(len(alphas)): #i: node index
+            alpha = alphas[i]                
+            weight = torch.empty_like(alpha)
+            
+            if i == fixed_info[0][0] or i == fixed_info[1][0]:
+                for j in range(alpha.size(0)+1):
+                    if j == fixed_info[0][1] or j == fixed_info[1][1]:
+                        weight[j] = 1
+                    else:
+                        denominator = torch.sum(torch.exp(alpha[j]))
+                        weight[j] = torch.exp(alpha[j]) / denominator
+            else:
+                for j in range(alpha.size(0)):
+                    denominator = torch.sum(torch.exp(alpha[j]))
+                    weight[j] = torch.exp(alpha[j]) / denominator
+                
+            weights.append(weight)
+            
+        return weights
