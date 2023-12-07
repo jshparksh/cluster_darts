@@ -53,7 +53,7 @@ class Architect(object):
 
     def _backward_step(self, input_valid, target_valid, epoch, cluster):
         if cluster == True:
-            loss = self._compute_loss(self.model(input_valid), target_valid) #, epoch)
+            loss = self._compute_loss(self.model(input_valid, fixed=True), target_valid) #, epoch)
         else:
             loss = self.criterion(self.model(input_valid), target_valid)
         loss.backward() #retain_graph=True)

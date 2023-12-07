@@ -172,8 +172,11 @@ class SearchCNNController(nn.Module):
 
     def forward(self, x, fixed=False):
         if fixed==True:
-            weights_normal = self.generate_weights_fixed(self.alpha_normal, cell_type='normal')
-            weights_reduce = self.generate_weights_fixed(self.alpha_reduce, cell_type='reduce')
+            weights_normal = self.generate_weights(self.alpha_normal)
+            weights_reduce = self.generate_weights(self.alpha_reduce)
+            #weights_normal = self.generate_weights_fixed(self.alpha_normal, cell_type='normal')
+            #weights_reduce = self.generate_weights_fixed(self.alpha_reduce, cell_type='reduce')
+            
         else:
             weights_normal = self.generate_weights(self.alpha_normal)
             weights_reduce = self.generate_weights(self.alpha_reduce)
@@ -349,13 +352,14 @@ class SearchCNNController(nn.Module):
         elif cell_type == 'reduce':
             fixed_info = self.fixed_info_reduce
         for i in range(len(alphas)): #i: node index
-            alpha = alphas[i]                
+            alpha = alphas[i]               
             weight = torch.empty_like(alpha)
             
             if i == fixed_info[0][0] or i == fixed_info[1][0]:
                 for j in range(alpha.size(0)+1):
                     if j == fixed_info[0][1] or j == fixed_info[1][1]:
-                        weight[j] = 1
+                        with torch.no_grad():
+                            weight[j] = torch.ones(10)#len(gt.PRIMITIVES_SECOND))
                     else:
                         denominator = torch.sum(torch.exp(alpha[j]))
                         weight[j] = torch.exp(alpha[j]) / denominator
@@ -365,5 +369,6 @@ class SearchCNNController(nn.Module):
                     weight[j] = torch.exp(alpha[j]) / denominator
                 
             weights.append(weight)
+        print('weights', weights)
             
         return weights

@@ -1,6 +1,7 @@
 """ CNN cell for architecture search """
 import torch
 import torch.nn as nn
+import genotypes as gt
 from models import ops
 
 
@@ -24,7 +25,8 @@ class SearchCell(nn.Module):
         self.multiplier = multiplier
         self._mixed_op_feature = {}
         self.C = C
-
+        self.cluster = False
+        self.fixed_info = None
         # If previous cell is reduction cell, current input size does not match with
         # output size of cell[k-2]. So the output[k-2] should be reduced by preprocessing.
         if reduction_p:
@@ -56,11 +58,41 @@ class SearchCell(nn.Module):
             offset += len(states)
             states.append(s)
         """
+        """print('dag[0]', len(self.dag[0]))
+        print('dag[0]', self.dag[0])
+        print('w_dag[0]', w_dag[0])
+        print('w_dag[0]', len(w_dag[0]))
+        print('dag[1]', len(self.dag[1]))
+        print('w_dag[1]', len(w_dag[1]))
+        print('dag[2]', len(self.dag[2]))
+        print('w_dag[2]', len(w_dag[2]))
+        print('dag[3]', len(self.dag[3]))
+        print('w_dag[3]', len(w_dag[3]))
+        input()"""
+        if self.cluster==True:
+            node_idx = 0
+            for edges, w_list in zip(self.dag, w_dag):
+                if node_idx == self.fixed_info[0][0] or node_idx == self.fixed_info[1][0]:
+                    w_list = torch.cat((w_list, torch.ones(len(gt.PRIMITIVES_SECOND)).unsqueeze(0).cuda()), dim=0)
+                    w_list[[node_idx, -1]] = w_list[[-1, node_idx]]
+                    print('node_idx', node_idx)
+                    print('w_list', w_list)
+                    print('len_states', len(states))
+                    input()
+                    for i, (s,w) in enumerate(zip(states, w_list)):
+                        if i == self.fixed_info[0][1] or i == self.fixed_info[1][1]:
+                            s_cur = edges[i](s, w)
+                        else:
+                            s_cur = edges[i](s, w)
+                    s_cur = sum(edges[i](s, w) for i, (s, w) in enumerate(zip(states, w_list)))
+                s_cur = sum(edges[i](s, w) for i, (s, w) in enumerate(zip(states, w_list)))
+                states.append(s_cur)
+                node_idx += 1
+        else:
+            for edges, w_list in zip(self.dag, w_dag):
+                s_cur = sum(edges[i](s, w) for i, (s, w) in enumerate(zip(states, w_list)))
+                states.append(s_cur)
             
-        for edges, w_list in zip(self.dag, w_dag):
-            s_cur = sum(edges[i](s, w) for i, (s, w) in enumerate(zip(states, w_list)))
-            states.append(s_cur)
-        
         for i in range(self.n_nodes):
             for j in range(2+i):
                 feature_str = "node{}_edge{}".format(i, j)
@@ -74,8 +106,9 @@ class SearchCell(nn.Module):
     def _swap_dag(self, fixed_info):
         # fix_info = [(node_idx, edge_idx, op_type), ...]
         # should call swap_ops() at ops.py first to swap MixedOp
-        
         self.new_dag = nn.ModuleList()
+        self.cluster = True
+        self.fixed_info = fixed_info
         for i in range(self.n_nodes):
             self.new_dag.append(nn.ModuleList())
             for j in range(2+i):
@@ -84,6 +117,7 @@ class SearchCell(nn.Module):
                     op = ops.OPS[fixed_info[0][2]](self.C, stride, affine=False)
                 elif i == fixed_info[1][0] and j == fixed_info[1][1]:
                     op = ops.OPS[fixed_info[1][2]](self.C, stride, affine=False)
-                op = ops.MixedOp(self.C, stride).swap_ops()
+                else:
+                    op = ops.MixedOp_Fixed(self.C, stride)
                 self.new_dag[i].append(op)
         self.dag = self.new_dag

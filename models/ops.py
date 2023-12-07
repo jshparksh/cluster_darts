@@ -289,9 +289,28 @@ class MixedOp(nn.Module):
     def feature(self):
         return self._feature
 
-    def swap_ops(self):
-        self._new_ops = nn.ModuleList()
+class MixedOp_Fixed(nn.Module):
+    """ Mixed operation """
+    def __init__(self, C, stride): #, cell_id, node_id, edge_id): #maybe this vars will be needed to save features for visualization
+        super().__init__()
+        self._ops = nn.ModuleList()
+        self._feature = []
+        self.C = C
+        self.stride = stride
+        
         for primitive in gt.PRIMITIVES_SECOND:
-            op = OPS[primitive](self.C, self.stride, affine=False)
-            self._new_ops.append(op)
-        self._ops = self._new_ops
+            op = OPS[primitive](C, stride, affine=False)
+            self._ops.append(op)
+
+    def forward(self, x, weights):
+        """
+        Args:
+            x: input
+            weights: weight for each operation
+        """
+        self._feature = [op(x) for op in self._ops]
+        
+        return sum(w * op(x) for w, op in zip(weights, self._ops))
+    
+    def feature(self):
+        return self._feature
