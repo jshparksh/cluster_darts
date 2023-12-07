@@ -58,34 +58,30 @@ class SearchCell(nn.Module):
             offset += len(states)
             states.append(s)
         """
-        """print('dag[0]', len(self.dag[0]))
-        print('dag[0]', self.dag[0])
-        print('w_dag[0]', w_dag[0])
-        print('w_dag[0]', len(w_dag[0]))
-        print('dag[1]', len(self.dag[1]))
-        print('w_dag[1]', len(w_dag[1]))
-        print('dag[2]', len(self.dag[2]))
-        print('w_dag[2]', len(w_dag[2]))
-        print('dag[3]', len(self.dag[3]))
-        print('w_dag[3]', len(w_dag[3]))
-        input()"""
         if self.cluster==True:
             node_idx = 0
             for edges, w_list in zip(self.dag, w_dag):
-                if node_idx == self.fixed_info[0][0] or node_idx == self.fixed_info[1][0]:
+                s_cur = 0
+                if node_idx == self.fixed_info[0][0]:
                     w_list = torch.cat((w_list, torch.ones(len(gt.PRIMITIVES_SECOND)).unsqueeze(0).cuda()), dim=0)
                     w_list[[node_idx, -1]] = w_list[[-1, node_idx]]
-                    print('node_idx', node_idx)
-                    print('w_list', w_list)
-                    print('len_states', len(states))
-                    input()
                     for i, (s,w) in enumerate(zip(states, w_list)):
-                        if i == self.fixed_info[0][1] or i == self.fixed_info[1][1]:
-                            s_cur = edges[i](s, w)
+                        if i == self.fixed_info[0][1]:
+                            s_out = edges[i](s)
                         else:
-                            s_cur = edges[i](s, w)
+                            s_out = edges[i](s, w)
+                        s_cur += s_out
+                elif node_idx == self.fixed_info[1][0]:
+                    w_list = torch.cat((w_list, torch.ones(len(gt.PRIMITIVES_SECOND)).unsqueeze(0).cuda()), dim=0)
+                    w_list[[node_idx, -1]] = w_list[[-1, node_idx]]
+                    for i, (s,w) in enumerate(zip(states, w_list)):
+                        if i == self.fixed_info[1][1]:
+                            s_out = edges[i](s)
+                        else:
+                            s_out = edges[i](s, w)
+                        s_cur += s_out
+                else:
                     s_cur = sum(edges[i](s, w) for i, (s, w) in enumerate(zip(states, w_list)))
-                s_cur = sum(edges[i](s, w) for i, (s, w) in enumerate(zip(states, w_list)))
                 states.append(s_cur)
                 node_idx += 1
         else:
@@ -96,7 +92,10 @@ class SearchCell(nn.Module):
         for i in range(self.n_nodes):
             for j in range(2+i):
                 feature_str = "node{}_edge{}".format(i, j)
-                self._mixed_op_feature[feature_str] = self.dag[i][j].feature() #ops.MixedOp().feature()
+                if i == self.fixed_info[0][0] or i == self.fixed_info[1][0]:
+                    self._mixed_op_feature[feature_str] = None
+                else:
+                    self._mixed_op_feature[feature_str] = self.dag[i][j].feature() #ops.MixedOp().feature()
                 
         return torch.cat(states[-self.multiplier:], dim=1)
 

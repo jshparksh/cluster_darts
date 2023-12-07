@@ -369,6 +369,5 @@ class SearchCNNController(nn.Module):
                     weight[j] = torch.exp(alpha[j]) / denominator
                 
             weights.append(weight)
-        print('weights', weights)
             
         return weights

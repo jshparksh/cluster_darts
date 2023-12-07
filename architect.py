@@ -139,11 +139,20 @@ class Architect(object):
         # Calculate mean of std values for loss
         iteration = 0
         mixed_cell_feature = self.model.net.mixed_cell_feature()
+        fixed_info_normal = self.model.fixed_info_normal
+        fixed_info_reduce = self.model.fixed_info_reduce
         
         # max value for normalization
         for cell in range(self.model.n_layers):
+            if i in [self.model.n_layers//3, 2*self.model.n_layers//3]:
+                reduction = True
+            else:
+                reduction = False
             for node in range(self.model.n_nodes):
                 for edge in range(2+node):
+                    if reduction == True and (node == fixed_info_reduce[0][0] or node == fixed_info_reduce[1][0]) and (edge == fixed_info_reduce[0][1] or edge == fixed_info_reduce[1][1]):
+                        loss += 0
+                     
                     feature = mixed_cell_feature[cell]["node{}_edge{}".format(node, edge)]
                     if self.anchor == 'True':
                         group_dist, anchor_dist = utils.compute_group_std(feature, indices, self.anchor)
