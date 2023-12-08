@@ -96,7 +96,6 @@ class SearchCell(nn.Module):
                     self._mixed_op_feature[feature_str] = None
                 else:
                     self._mixed_op_feature[feature_str] = self.dag[i][j].feature() #ops.MixedOp().feature()
-                
         return torch.cat(states[-self.multiplier:], dim=1)
 
     def mixed_op_feature(self):

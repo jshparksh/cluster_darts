@@ -144,15 +144,26 @@ class Architect(object):
         
         # max value for normalization
         for cell in range(self.model.n_layers):
-            if i in [self.model.n_layers//3, 2*self.model.n_layers//3]:
+            if cell in [self.model.n_layers//3, 2*self.model.n_layers//3]:
                 reduction = True
             else:
                 reduction = False
+            
             for node in range(self.model.n_nodes):
                 for edge in range(2+node):
-                    if reduction == True and (node == fixed_info_reduce[0][0] or node == fixed_info_reduce[1][0]) and (edge == fixed_info_reduce[0][1] or edge == fixed_info_reduce[1][1]):
-                        loss += 0
-                     
+                    if reduction == True:
+                        if node == fixed_info_reduce[0][0] or node == fixed_info_reduce[1][0]:
+                            if edge == fixed_info_reduce[0][1] or edge == fixed_info_reduce[1][1]:
+                                loss += torch.tensor(0, dtype=torch.float32, requires_grad=True)
+                                iteration += 1
+                                break
+                    if reduction == False:
+                        if node == fixed_info_normal[0][0] or node == fixed_info_normal[1][0]:
+                            if edge == fixed_info_normal[0][1] or edge == fixed_info_normal[1][1]:
+                                loss += torch.tensor(0, dtype=torch.float32, requires_grad=True)
+                                iteration += 1
+                                break
+                            
                     feature = mixed_cell_feature[cell]["node{}_edge{}".format(node, edge)]
                     if self.anchor == 'True':
                         group_dist, anchor_dist = utils.compute_group_std(feature, indices, self.anchor)

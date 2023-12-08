@@ -83,7 +83,6 @@ class SearchCNN(nn.Module):
         for i, cell in enumerate(self.cells):
             weights = weights_reduce if cell.reduction else weights_normal
             s0, s1 = s1, cell(s0, s1, weights)
-            
         out = self.gap(s1)
         out = out.view(out.size(0), -1) # flatten
         logits = self.linear(out)
