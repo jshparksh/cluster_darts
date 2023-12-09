@@ -88,12 +88,15 @@ class SearchCell(nn.Module):
             for edges, w_list in zip(self.dag, w_dag):
                 s_cur = sum(edges[i](s, w) for i, (s, w) in enumerate(zip(states, w_list)))
                 states.append(s_cur)
-            
+        
         for i in range(self.n_nodes):
             for j in range(2+i):
                 feature_str = "node{}_edge{}".format(i, j)
-                if i == self.fixed_info[0][0] or i == self.fixed_info[1][0]:
-                    self._mixed_op_feature[feature_str] = None
+                if self.cluster == True:
+                    if (i == self.fixed_info[0][0] and j == self.fixed_info[0][1]) or (i == self.fixed_info[1][0] and j == self.fixed_info[1][1]):
+                        self._mixed_op_feature[feature_str] = None
+                    else:
+                        self._mixed_op_feature[feature_str] = self.dag[i][j].feature()
                 else:
                     self._mixed_op_feature[feature_str] = self.dag[i][j].feature() #ops.MixedOp().feature()
         return torch.cat(states[-self.multiplier:], dim=1)

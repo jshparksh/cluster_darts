@@ -85,6 +85,7 @@ def main():
     
     architect = Architect(model, criterion, config)
     
+    fixed_info_normal, fixed_info_reduce = None, None
     # training loop
     for epoch in range(config.epochs):
         lr_scheduler.step()
@@ -96,7 +97,7 @@ def main():
         if epoch == config.switching_epoch:
             logger.info("Switching to cluster training mode")
             config.cluster = True
-            model.transfer_mode()
+            fixed_info_normal, fixed_info_reduce = model.transfer_mode()
             
             # new model and new optimizers
             model = model.cuda()
@@ -105,8 +106,7 @@ def main():
             architect.new_arch_optimizer()
             # ops -> swap_ops
             # get genotype, select top 2 skip, pooling layers and fix with search_cell -> swap_dag
-            
-        train(train_loader, valid_loader, model, architect, w_optim, lr, epoch) #alpha_optim,
+        train(train_loader, valid_loader, model, architect, w_optim, lr, epoch, fixed_info_normal, fixed_info_reduce) #alpha_optim,
         """
         # validation
         cur_step = (epoch+1) * len(train_loader)
@@ -115,14 +115,15 @@ def main():
         # log
         # genotype
         if epoch >= config.switching_epoch:
-            genotype = model.genotype_fixed()
+            genotype = model.genotype_fixed(fixed_info_normal, fixed_info_reduce)
         else:
             genotype = model.genotype()
         logger.info("genotype = {}".format(genotype))
         with open(os.path.join(config.path, 'genotype.txt'), 'w') as f:
             f.write(str(genotype))
-
-        utils.save_checkpoint(model.state_dict(), config.path, True)
+        
+        if config.cluster == True:
+            utils.save_checkpoint(model.state_dict(), os.path.join(config.path, 'features', str(epoch)), True)
         print()
     """
         # genotype as a image
@@ -145,7 +146,7 @@ def main():
     logger.info("Best Genotype = {}".format(best_genotype))
     """
 
-def train(train_loader, valid_loader, model, architect, w_optim, lr, epoch): #alpha_optim,
+def train(train_loader, valid_loader, model, architect, w_optim, lr, epoch, fixed_info_normal, fixed_info_reduce): #alpha_optim,
     top1 = utils.AverageMeter()
     top5 = utils.AverageMeter()
     losses = utils.AverageMeter()
@@ -206,7 +207,10 @@ def train(train_loader, valid_loader, model, architect, w_optim, lr, epoch): #al
         writer.add_scalar('train/top1', prec1.item(), cur_step)
         writer.add_scalar('train/top5', prec5.item(), cur_step)
         cur_step += 1
-    model.net._save_features(config.path, epoch)
+        if cur_step == epoch*len(train_loader) + 2:
+            break
+    if config.cluster == True:
+        model.net._save_features(config.path, epoch, fixed_info_normal, fixed_info_reduce)
 
     logger.info("Train: [{:2d}/{}] Final Prec@1 {:.4%}".format(epoch+1, config.epochs, top1.avg))
 

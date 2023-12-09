@@ -108,7 +108,6 @@ def fix_np(alpha, k):
     # fix two top value np layer and return info
     # k: number of fixed np edges
     np_info = []
-    
     np_edge = []
     node_idx = 0
 
@@ -156,7 +155,7 @@ def parse(alpha, k):
     each node has two edges (k=2) in CNN.
     """
     gene = []
-    assert PRIMITIVES[-1] == 'none' # assume last PRIMITIVE is 'none'
+    assert PRIMITIVES_FIRST[-1] == 'none' # assume last PRIMITIVE is 'none'
 
     # 1) Convert the mixed op to discrete edge (single op) by choosing top-1 weight edge
     # 2) Choose top-k edges per node by edge score (top-1 weight in edge)
@@ -167,7 +166,7 @@ def parse(alpha, k):
         node_gene = []
         for edge_idx in topk_edge_indices:
             prim_idx = primitive_indices[edge_idx]
-            prim = PRIMITIVES[prim_idx]
+            prim = PRIMITIVES_FIRST[prim_idx]
             node_gene.append((prim, edge_idx.item()))
 
         gene.append(node_gene)
@@ -181,7 +180,7 @@ def parse_fixed(alpha, k, fixed_info):
     # if I get type -> fix the non-mixedOp edge into that edge
     # change k value for that node 
     gene = []
-    assert PRIMITIVES[-1] == 'none' # assume last PRIMITIVE is 'none'
+    assert PRIMITIVES_SECOND[-1] == 'none' # assume last PRIMITIVE is 'none'
     node_idx = 0
     
     for edges in alpha:
@@ -192,8 +191,8 @@ def parse_fixed(alpha, k, fixed_info):
             node_gene.append((fixed_info[0][2], fixed_info[0][1]))
             for edge_idx in topk_edge_indices:
                 prim_idx = primitive_indices[edge_idx]
-                prim = PRIMITIVES[prim_idx]
-                if edge_idx.item >= fixed_info[0][1]:
+                prim = PRIMITIVES_SECOND[prim_idx]
+                if edge_idx >= fixed_info[0][1]:
                     node_gene.append((prim, edge_idx.item()+1))
                 else:
                     node_gene.append((prim, edge_idx.item()))
@@ -204,8 +203,8 @@ def parse_fixed(alpha, k, fixed_info):
             node_gene.append((fixed_info[1][2], fixed_info[1][1]))
             for edge_idx in topk_edge_indices:
                 prim_idx = primitive_indices[edge_idx]
-                prim = PRIMITIVES[prim_idx]
-                if edge_idx.item >= fixed_info[1][1]:
+                prim = PRIMITIVES_SECOND[prim_idx]
+                if edge_idx >= fixed_info[1][1]:
                     node_gene.append((prim, edge_idx.item()+1))
                 else:
                     node_gene.append((prim, edge_idx.item()))
@@ -215,7 +214,7 @@ def parse_fixed(alpha, k, fixed_info):
             node_gene = []
             for edge_idx in topk_edge_indices:
                 prim_idx = primitive_indices[edge_idx]
-                prim = PRIMITIVES[prim_idx]
+                prim = PRIMITIVES_SECOND[prim_idx]
                 node_gene.append((prim, edge_idx.item()))
 
         gene.append(node_gene)

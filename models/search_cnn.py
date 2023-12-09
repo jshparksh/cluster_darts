@@ -93,13 +93,24 @@ class SearchCNN(nn.Module):
             self._mixed_cell_feature[i] = self.cells[i].mixed_op_feature()
         return self._mixed_cell_feature
     
-    def _save_features(self, path, curr_epoch):
+    def _save_features(self, path, curr_epoch, fixed_info_normal, fixed_info_reduce):
         mixed_cell_feature = self.mixed_cell_feature()
         dir_epoch = os.path.join(path, "features", str(curr_epoch))
         os.system("mkdir -p {}".format(dir_epoch))
+        reduction = False
         for cell in range(self.n_layers):
+            if cell in [self.n_layers//3, 2*self.n_layers//3]:
+                reduction = True
+            else:
+                reduction = False
             for node in range(self.n_nodes):
                 for edge in range(2+node):
+                    if (node == fixed_info_reduce[0][0] and edge == fixed_info_reduce[0][1]) or (node == fixed_info_reduce[1][0] and edge == fixed_info_reduce[1][1]):
+                        if reduction == True:
+                            continue
+                    if (node == fixed_info_normal[0][0] and edge == fixed_info_normal[0][1]) or (node == fixed_info_normal[1][0] and edge == fixed_info_normal[1][1]):
+                        if reduction == False:
+                            continue
                     feature = mixed_cell_feature[cell]["node{}_edge{}".format(node, edge)]
                     feature_str = "cell{}_node{}_edge{}.pk".format(cell, node, edge)
                     save_features(feature[:-1], os.path.join(dir_epoch, feature_str))
@@ -123,6 +134,7 @@ class SearchCNN(nn.Module):
                 cell._swap_dag(fixed_info_reduce)
             else:
                 cell._swap_dag(fixed_info_normal)
+
             reduction_p = reduction
             self.new_cells.append(cell)
             C_cur_out = C_cur * self.n_nodes
@@ -324,7 +336,9 @@ class SearchCNNController(nn.Module):
     def transfer_mode(self):
         fixed_info_normal, fixed_info_reduce = self.fixed_layer_info()
         self.net._replace_cells(fixed_info_normal, fixed_info_reduce)
-        self._transfer_alphas(fixed_info_normal, fixed_info_reduce)    
+        self._transfer_alphas(fixed_info_normal, fixed_info_reduce)
+
+        return fixed_info_normal, fixed_info_reduce
 
     def arch_parameters(self):
         for n, p in self._arch_parameters:

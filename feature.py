@@ -36,7 +36,7 @@ def compute_online(data_loader, model, feature_dir):
     save_dir = os.path.join(feature_dir, "online")
     os.system("mkdir -p {}".format(save_dir))
 
-    op_names = genotypes.PRIMITIVES
+    op_names = genotypes.PRIMITIVES_SECOND
     num_features = len(op_names)
 
     lambda_zero_means = lambda: [0.0 for _ in range(num_features)]
