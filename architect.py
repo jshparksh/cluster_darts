@@ -154,12 +154,14 @@ class Architect(object):
                     if (node == fixed_info_reduce[0][0] and edge == fixed_info_reduce[0][1]) or (node == fixed_info_reduce[1][0] and edge == fixed_info_reduce[1][1]):
                         if reduction == True:
                             loss += torch.tensor(0, dtype=torch.float32, requires_grad=True)
+                            loss = loss.to(torch.device(self.first_gpu))
                             iteration += 1
                             continue
                     
                     if (node == fixed_info_normal[0][0] and edge == fixed_info_normal[0][1]) or (node == fixed_info_normal[1][0] and edge == fixed_info_normal[1][1]):
                         if reduction == False:
                             loss += torch.tensor(0, dtype=torch.float32, requires_grad=True)
+                            loss = loss.to(torch.device(self.first_gpu))
                             iteration += 1
                             continue
                     

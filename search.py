@@ -124,6 +124,10 @@ def main():
         
         if config.cluster == True:
             utils.save_checkpoint(model.state_dict(), os.path.join(config.path, 'features', str(epoch)), True)
+        else:
+            if not os.path.exists(os.path.join(config.path, str(epoch))):
+                os.mkdir(os.path.join(config.path, str(epoch)))
+            utils.save_checkpoint(model.state_dict(), os.path.join(config.path, str(epoch)), False)
         print()
     """
         # genotype as a image
@@ -207,8 +211,9 @@ def train(train_loader, valid_loader, model, architect, w_optim, lr, epoch, fixe
         writer.add_scalar('train/top1', prec1.item(), cur_step)
         writer.add_scalar('train/top5', prec5.item(), cur_step)
         cur_step += 1
-        if cur_step == epoch*len(train_loader) + 2:
-            break
+        
+        """if cur_step == epoch*len(train_loader) + 3:
+            break"""
     if config.cluster == True:
         model.net._save_features(config.path, epoch, fixed_info_normal, fixed_info_reduce)
 
