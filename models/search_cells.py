@@ -63,11 +63,11 @@ class SearchCell(nn.Module):
             for edges, w_list in zip(self.dag, w_dag):
                 s_cur = 0
                 if node_idx == self.fixed_info[0][0]:
-                    w_list = torch.cat((w_list, torch.ones(len(gt.PRIMITIVES_SECOND)).unsqueeze(0).cuda()), dim=0)
-                    w_list[[node_idx, -1]] = w_list[[-1, node_idx]]
+                    w_list = torch.cat((w_list, torch.ones(len(gt.PRIMITIVES_SECOND)).unsqueeze(0).cuda()), dim=0) # to match the size of w_list
+                    w_list[[node_idx, -1]] = w_list[[-1, node_idx]] # swap the position of the fixed op and the last op
                     for i, (s,w) in enumerate(zip(states, w_list)):
                         if i == self.fixed_info[0][1]:
-                            s_out = edges[i](s)
+                            s_out = edges[i](s) # edges[i] is the fixed op, no need for w
                         else:
                             s_out = edges[i](s, w)
                         s_cur += s_out
