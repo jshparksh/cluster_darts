@@ -372,7 +372,7 @@ class SearchCNNController(nn.Module):
                 for j in range(alpha.size(0)+1):
                     if j == fixed_info[0][1] or j == fixed_info[1][1]:
                         with torch.no_grad():
-                            weight[j] = torch.ones(10)#len(gt.PRIMITIVES_SECOND))
+                            weight[j] = torch.ones(10) #len(gt.PRIMITIVES_SECOND))
                     else:
                         denominator = torch.sum(torch.exp(alpha[j]))
                         weight[j] = torch.exp(alpha[j]) / denominator

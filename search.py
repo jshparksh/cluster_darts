@@ -38,7 +38,8 @@ def main():
     torch.cuda.manual_seed_all(config.seed)
 
     torch.backends.cudnn.benchmark = True
-
+    torch.backeneds.cudnn.enabled = True
+    
     # get data with meta info
     input_size, input_channels, n_classes, train_data = utils.get_data(
         config.dataset, config.data_path, cutout_length=0, validation=False)
@@ -214,6 +215,7 @@ def train(train_loader, valid_loader, model, architect, w_optim, lr, epoch, fixe
         
         """if cur_step == epoch*len(train_loader) + 3:
             break"""
+        
     if config.cluster == True:
         model.net._save_features(config.path, epoch, fixed_info_normal, fixed_info_reduce)
 

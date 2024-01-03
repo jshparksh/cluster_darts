@@ -126,7 +126,8 @@ class Architect(object):
 
     def _cluster_loss(self):
         # get output data from MixedOP, flatten and mean value
-        loss = 0
+        loss = torch.tensor(0, dtype=torch.float32, requires_grad=True)
+        loss = loss.to(torch.device(self.first_gpu))
         op_groups = gt.PRIMITIVES_GROUPS
         
         # Group indices for seperation
@@ -153,15 +154,11 @@ class Architect(object):
                 for edge in range(2+node):
                     if (node == fixed_info_reduce[0][0] and edge == fixed_info_reduce[0][1]) or (node == fixed_info_reduce[1][0] and edge == fixed_info_reduce[1][1]):
                         if reduction == True:
-                            loss += torch.tensor(0, dtype=torch.float32, requires_grad=True)
-                            loss = loss.to(torch.device(self.first_gpu))
                             iteration += 1
                             continue
                     
                     if (node == fixed_info_normal[0][0] and edge == fixed_info_normal[0][1]) or (node == fixed_info_normal[1][0] and edge == fixed_info_normal[1][1]):
                         if reduction == False:
-                            loss += torch.tensor(0, dtype=torch.float32, requires_grad=True)
-                            loss = loss.to(torch.device(self.first_gpu))
                             iteration += 1
                             continue
                     

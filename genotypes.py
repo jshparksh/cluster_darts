@@ -48,6 +48,8 @@ PRIMITIVES_SECOND = [
     'dil_conv_3x3_4',
     'none'
 ]
+# Each group's first primitive should be highest bit-width operation
+# For anchor-based clustering loss
 PRIMITIVES_GROUPS = [
     [
     'conv_3x3_16',
