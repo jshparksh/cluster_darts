@@ -165,7 +165,9 @@ class Architect(object):
                     feature = mixed_cell_feature[cell]["node{}_edge{}".format(node, edge)]
                     if self.anchor == 'True':
                         group_dist, anchor_dist = utils.compute_group_std(feature, indices, self.anchor)
+                        # to match loss device
                         group_dist, anchor_dist = group_dist.to(torch.device(self.first_gpu)), anchor_dist.to(torch.device(self.first_gpu))
+                        
                         if group_dist > self.max_lmd:
                             self.max_lmd = group_dist
                         if anchor_dist < self.min_lmd:
