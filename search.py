@@ -38,7 +38,7 @@ def main():
     torch.cuda.manual_seed_all(config.seed)
 
     torch.backends.cudnn.benchmark = True
-    torch.backeneds.cudnn.enabled = True
+    torch.backends.cudnn.enabled = True
     
     # get data with meta info
     input_size, input_channels, n_classes, train_data = utils.get_data(
